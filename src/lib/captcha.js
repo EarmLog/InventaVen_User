@@ -67,7 +67,7 @@ function generarCodigoCaptcha() {
 
   return {
     codigo,
-    imagen: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+    imagen: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
   };
 }
 
