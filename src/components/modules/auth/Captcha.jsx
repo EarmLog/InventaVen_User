@@ -52,7 +52,7 @@ export default function Captcha({ onTicket, disabled = false }) {
       const respuestaHttp = await fetch("/api/captcha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: desafio.token, respuesta }),
+        body: JSON.stringify({ token: desafio.token, respuesta: Number(respuesta) }),
       });
       const datos = await respuestaHttp.json().catch(() => ({}));
       if (!respuestaHttp.ok || !datos.ticket) {
@@ -83,29 +83,21 @@ export default function Captcha({ onTicket, disabled = false }) {
         <div className="flex items-center justify-between gap-2">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-[var(--texto-suave)]">
             <ShieldCheck className="h-4 w-4 text-[var(--primario)]" />
-            {cargando ? "Generando imagen..." : "Imagen de verificación"}
+            {cargando ? "Generando operación..." : desafio?.pregunta || "Desafío no disponible"}
           </p>
           <button
             type="button"
             onClick={() => cargarDesafio()}
             disabled={cargando || verificando || disabled}
             className="rounded-lg p-1.5 text-[var(--texto-suave)] transition hover:bg-[var(--superficie-3)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Generar otra imagen de verificación"
-            title="Generar otra imagen"
+            aria-label="Generar otro desafío de seguridad"
+            title="Generar otro desafío"
           >
             <RefreshCw className={["h-4 w-4", cargando ? "animate-spin" : ""].join(" ")} />
           </button>
         </div>
 
-        {desafio?.imagen ? (
-          <img
-            src={desafio.imagen}
-            alt="Imagen de verificación"
-            className="mt-2 h-16 w-full max-w-[240px] rounded-lg border border-[var(--borde)] bg-white object-contain"
-          />
-        ) : null}
-
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="mt-2 flex gap-2">
           <Entrada
             value={respuesta}
             onChange={(evento) => setRespuesta(evento.target.value)}
@@ -115,8 +107,8 @@ export default function Captcha({ onTicket, disabled = false }) {
                 verificar();
               }
             }}
-            placeholder="Escribe el código"
-            inputMode="text"
+            placeholder="Escribe el resultado"
+            inputMode="numeric"
             autoComplete="off"
             disabled={cargando || verificando || disabled || !desafio}
             className="min-w-0 flex-1"
@@ -133,8 +125,7 @@ export default function Captcha({ onTicket, disabled = false }) {
         </div>
 
         <p className="mt-2 text-[10px] leading-relaxed text-[var(--texto-tenue)]">
-          Ingresa el código de la imagen para demostrar que eres una persona. El
-          desafío vence en 5 minutos.
+          Resuelve la operación matemática para demostrar que eres una persona. El desafío vence en 5 minutos.
         </p>
       </div>
     </Campo>
