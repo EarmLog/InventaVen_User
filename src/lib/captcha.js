@@ -1,6 +1,6 @@
 import {
   createHmac,
-  randomInt,
+  randomBytes,
   randomUUID,
   timingSafeEqual,
 } from "node:crypto";
@@ -51,8 +51,24 @@ function decodificarCarga(token) {
 function normalizarRespuesta(respuesta) {
   return String(respuesta ?? "")
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "");
+    .toUpperCase();
+}
+
+function generarCodigoCaptcha() {
+  const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(6);
+  const codigo = Array.from(bytes, (byte) => caracteres[byte % caracteres.length]).join("");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="64" viewBox="0 0 240 64" role="img" aria-label="Imagen de verificación">
+  <rect width="240" height="64" rx="12" fill="#111827" />
+  <rect x="2" y="2" width="236" height="60" rx="10" fill="none" stroke="#6b7280" strokeWidth="1.5" />
+  <text x="120" y="40" fontFamily="Arial, sans-serif" fontSize="28" fontWeight="700" fill="#ffffff" textAnchor="middle">${codigo}</text>
+</svg>`;
+
+  return {
+    codigo,
+    imagen: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
+  };
 }
 
 function calcularHuella(id, respuesta) {
@@ -61,46 +77,27 @@ function calcularHuella(id, respuesta) {
     .digest("base64url");
 }
 
-function generarOperacion() {
-  const tipo = randomInt(0, 3);
-
-  if (tipo === 0) {
-    const a = randomInt(2, 13);
-    const b = randomInt(2, 13);
-    return { pregunta: `¿Cuánto es ${a} + ${b}?`, respuesta: a + b };
-  }
-
-  if (tipo === 1) {
-    const a = randomInt(10, 31);
-    const b = randomInt(1, a);
-    return { pregunta: `¿Cuánto es ${a} - ${b}?`, respuesta: a - b };
-  }
-
-  const a = randomInt(2, 10);
-  const b = randomInt(2, 10);
-  return { pregunta: `¿Cuánto es ${a} × ${b}?`, respuesta: a * b };
-}
-
-export function crearDesafio() {
+function crearDesafio() {
   const id = randomUUID();
   const expiraEn = Date.now() + DURACION_DESAFIO_MS;
-  const operacion = generarOperacion();
+  const { codigo, imagen } = generarCodigoCaptcha();
   const token = codificarCarga({
     tipo: "desafio",
     id,
     expiraEn,
-    huella: calcularHuella(id, operacion.respuesta),
+    huella: calcularHuella(id, codigo),
+    respuesta: codigo,
   });
 
   return {
     token,
-    pregunta: operacion.pregunta,
+    imagen,
     expiraEn: new Date(expiraEn).toISOString(),
     duracionSegundos: Math.floor(DURACION_DESAFIO_MS / 1000),
   };
 }
 
-export function validarDesafio(token, respuesta) {
+function validarDesafio(token, respuesta) {
   const carga = decodificarCarga(token);
   if (!carga || carga.tipo !== "desafio") {
     return { valido: false, motivo: "La verificación de seguridad no es válida." };
@@ -110,13 +107,14 @@ export function validarDesafio(token, respuesta) {
     return { valido: false, motivo: "La verificación de seguridad expiró." };
   }
 
-  const esperada = Buffer.from(calcularHuella(carga.id, respuesta));
+  const respuestaIngresada = normalizarRespuesta(respuesta);
+  const esperada = Buffer.from(calcularHuella(String(carga.id || ""), respuestaIngresada));
   const recibida = Buffer.from(String(carga.huella || ""));
   const coincide =
     esperada.length === recibida.length && timingSafeEqual(esperada, recibida);
 
   if (!coincide) {
-    return { valido: false, motivo: "La respuesta de seguridad es incorrecta." };
+    return { valido: false, motivo: "El código de la imagen no es correcto." };
   }
 
   const expiraEn = Date.now() + DURACION_TICKET_MS;
