@@ -9,6 +9,7 @@ import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
 import Alerta from "@/components/ui/Alerta";
+import Modal from "@/components/ui/Modal";
 import Captcha from "@/components/modules/auth/Captcha";
 import { useSesion } from "@/context/SesionContext";
 
@@ -22,25 +23,19 @@ export default function PaginaLogin() {
   const [error, setError] = useState("");
   const [captchaTicket, setCaptchaTicket] = useState("");
   const [versionCaptcha, setVersionCaptcha] = useState(0);
+  const [mostrarModalCaptcha, setMostrarModalCaptcha] = useState(false);
 
   useEffect(() => {
     if (sesion) router.replace("/panel");
   }, [sesion, router]);
 
-  async function enviar(evento) {
-    evento.preventDefault();
-    setError("");
-    if (!correo.trim() || !contrasena) {
-      setError("Ingresa tu correo y contraseña.");
-      return;
-    }
-    if (!captchaTicket) {
-      setError("Completa la verificación de seguridad para continuar.");
-      return;
-    }
+  async function realizarLogin(ticketUsar) {
+    const ticket = ticketUsar || captchaTicket;
+    if (!ticket) return;
     setCargando(true);
+    setError("");
     try {
-      await iniciarSesion({ correo, contrasena, captcha: captchaTicket });
+      await iniciarSesion({ correo, contrasena, captcha: ticket });
       toast.success("Bienvenido de vuelta a InventaVen.");
       router.replace("/panel");
     } catch (err) {
@@ -50,6 +45,20 @@ export default function PaginaLogin() {
     } finally {
       setCargando(false);
     }
+  }
+
+  async function enviar(evento) {
+    evento.preventDefault();
+    setError("");
+    if (!correo.trim() || !contrasena) {
+      setError("Ingresa tu correo y contraseña.");
+      return;
+    }
+    if (!captchaTicket) {
+      setMostrarModalCaptcha(true);
+      return;
+    }
+    await realizarLogin(captchaTicket);
   }
 
   return (
@@ -106,12 +115,6 @@ export default function PaginaLogin() {
           </div>
         </Campo>
 
-        <Captcha
-          key={versionCaptcha}
-          onTicket={setCaptchaTicket}
-          disabled={cargando}
-        />
-
         <div className="flex items-center justify-end">
           <Link
             href="/recuperar"
@@ -126,6 +129,26 @@ export default function PaginaLogin() {
           <ArrowRight className="h-4 w-4" />
         </Boton>
       </form>
+
+      <Modal
+        abierto={mostrarModalCaptcha}
+        onCerrar={() => setMostrarModalCaptcha(false)}
+        titulo="Verificación de seguridad"
+        descripcion="Resuelve la verificación para continuar con tu acceso."
+        ancho="sm"
+      >
+        <Captcha
+          key={versionCaptcha}
+          onTicket={async (ticket) => {
+            if (ticket) {
+              setCaptchaTicket(ticket);
+              setMostrarModalCaptcha(false);
+              await realizarLogin(ticket);
+            }
+          }}
+          disabled={cargando}
+        />
+      </Modal>
 
       <p className="mt-6 text-center text-sm text-[var(--texto-suave)]">
         ¿No tienes cuenta?{" "}
