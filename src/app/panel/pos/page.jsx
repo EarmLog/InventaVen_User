@@ -8,6 +8,7 @@ import {
   Boxes,
   Camera,
   PackageOpen,
+  QrCode,
   Search,
   ShoppingCart,
   Tag,
@@ -24,6 +25,7 @@ import Etiqueta from "@/components/ui/Etiqueta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 import Modal from "@/components/ui/Modal";
 import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
+import ModalEmparejamientoQR from "@/components/ui/ModalEmparejamientoQR";
 import PanelCarrito from "@/components/modules/pos/PanelCarrito";
 import ModalCobro from "@/components/modules/pos/ModalCobro";
 import ModalFactura from "@/components/modules/pos/ModalFactura";
@@ -55,6 +57,7 @@ export default function PaginaPOS() {
   const [factura, setFactura] = useState(null);
   const [aplicarIva, setAplicarIva] = useState(true);
   const [escanerAbierto, setEscanerAbierto] = useState(false);
+  const [qrAbierto, setQrAbierto] = useState(false);
 
   const activos = useMemo(
     () => productos.filter((producto) => producto.activo !== false),
@@ -305,6 +308,14 @@ export default function PaginaPOS() {
                 <Camera className="h-4 w-4" />
                 <span className="hidden sm:inline">Escanear</span>
               </Boton>
+              <Boton
+                variante="secundario"
+                onClick={() => setQrAbierto(true)}
+                title="Conectar escáner móvil (QR)"
+              >
+                <QrCode className="h-4 w-4 text-[var(--primario)]" />
+                <span className="hidden sm:inline">Móvil QR</span>
+              </Boton>
             </div>
           </Tarjeta>
 
@@ -327,6 +338,29 @@ export default function PaginaPOS() {
                 toast.success(`Producto agregado: ${encontrado.nombre}`);
               } else {
                 toast.info(`Código escaneado: ${codigo}`);
+              }
+            }}
+          />
+
+          <ModalEmparejamientoQR
+            abierto={qrAbierto}
+            onCerrar={() => setQrAbierto(false)}
+            onScan={(codigo) => {
+              setBusqueda(codigo);
+              const encontrado = activos.find(
+                (p) =>
+                  p.sku.toLowerCase() === codigo.toLowerCase() ||
+                  (p.variantes || []).some((v) => v.sku.toLowerCase() === codigo.toLowerCase())
+              );
+              if (encontrado) {
+                if ((encontrado.variantes || []).length > 0) {
+                  setProductoVariante(encontrado);
+                } else {
+                  agregar(encontrado);
+                }
+                toast.success(`Producto agregado desde móvil: ${encontrado.nombre}`);
+              } else {
+                toast.info(`Código escaneado desde móvil: ${codigo}`);
               }
             }}
           />

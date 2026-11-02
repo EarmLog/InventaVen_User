@@ -5,12 +5,14 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertTriangle,
   Boxes,
+  Camera,
   DollarSign,
   Eye,
   PackageOpen,
   PackagePlus,
   Pencil,
   Plus,
+  QrCode,
   RefreshCw,
   Search,
   Tag,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { useTasa } from "@/context/TasaContext";
+import { toast } from "sonner";
 import Tarjeta from "@/components/ui/Tarjeta";
 import Boton from "@/components/ui/Boton";
 import Entrada from "@/components/ui/Entrada";
@@ -28,6 +31,8 @@ import ModalProducto from "@/components/modules/inventario/ModalProducto";
 import ModalRenovar from "@/components/modules/inventario/ModalRenovar";
 import ModalEliminar from "@/components/modules/inventario/ModalEliminar";
 import ModalDetalleProducto from "@/components/modules/inventario/ModalDetalleProducto";
+import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
+import ModalEmparejamientoQR from "@/components/ui/ModalEmparejamientoQR";
 import { calcularGanancia, etiquetaEmpaque } from "@/lib/utilidades/precios";
 import {
   formatearFecha,
@@ -74,6 +79,8 @@ export default function PaginaInventario() {
   const [productoRenovar, setProductoRenovar] = useState(null);
   const [productoEliminar, setProductoEliminar] = useState(null);
   const [productoDetalle, setProductoDetalle] = useState(null);
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
+  const [qrAbierto, setQrAbierto] = useState(false);
 
   const categorias = useMemo(
     () => [...new Set(productos.map((producto) => producto.categoria).filter(Boolean))].sort(),
@@ -220,16 +227,44 @@ export default function PaginaInventario() {
           </Selector>
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t border-[var(--borde)] pt-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--borde)] pt-3">
           <p className="text-[11px] text-[var(--texto-suave)]">
             {filtrados.length} de {productos.length} producto
             {productos.length === 1 ? "" : "s"}
           </p>
-          <Boton variante="fantasma" tamano="sm" onClick={abrirNuevo}>
-            <PackagePlus className="h-3.5 w-3.5" />
-            Nuevo
-          </Boton>
+          <div className="flex items-center gap-2">
+            <Boton variante="secundario" tamano="sm" onClick={() => setEscanerAbierto(true)}>
+              <Camera className="h-3.5 w-3.5" />
+              Escanear
+            </Boton>
+            <Boton variante="secundario" tamano="sm" onClick={() => setQrAbierto(true)}>
+              <QrCode className="h-3.5 w-3.5 text-[var(--primario)]" />
+              QR Móvil
+            </Boton>
+            <Boton variante="fantasma" tamano="sm" onClick={abrirNuevo}>
+              <PackagePlus className="h-3.5 w-3.5" />
+              Nuevo
+            </Boton>
+          </div>
         </div>
+
+        <ModalEscanerCamara
+          abierto={escanerAbierto}
+          onCerrar={() => setEscanerAbierto(false)}
+          onScan={(codigo) => {
+            setBusqueda(codigo);
+            toast.success(`Código escaneado: ${codigo}`);
+          }}
+        />
+
+        <ModalEmparejamientoQR
+          abierto={qrAbierto}
+          onCerrar={() => setQrAbierto(false)}
+          onScan={(codigo) => {
+            setBusqueda(codigo);
+            toast.success(`Código recibido desde móvil: ${codigo}`);
+          }}
+        />
       </Tarjeta>
 
       {productos.length === 0 ? (
