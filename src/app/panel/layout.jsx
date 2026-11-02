@@ -46,6 +46,11 @@ function ContenidoPanel({ children }) {
     if (!sesion) return;
     asegurarDatosIniciales().catch(() => null);
     refrescarPerfil();
+    if (sesion.user?.email === "demo.inventaven2026@gmail.com") {
+      import("@/lib/db/demoSemilla").then(({ sembrarDatosDemo }) => {
+        sembrarDatosDemo().catch(() => null);
+      });
+    }
   }, [sesion, refrescarPerfil]);
 
   useEffect(() => {
