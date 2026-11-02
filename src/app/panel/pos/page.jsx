@@ -6,6 +6,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import {
   AlertTriangle,
   Boxes,
+  Camera,
   PackageOpen,
   Search,
   ShoppingCart,
@@ -22,6 +23,7 @@ import Selector from "@/components/ui/Selector";
 import Etiqueta from "@/components/ui/Etiqueta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 import Modal from "@/components/ui/Modal";
+import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
 import PanelCarrito from "@/components/modules/pos/PanelCarrito";
 import ModalCobro from "@/components/modules/pos/ModalCobro";
 import ModalFactura from "@/components/modules/pos/ModalFactura";
@@ -52,6 +54,7 @@ export default function PaginaPOS() {
   const [carritoMovil, setCarritoMovil] = useState(false);
   const [factura, setFactura] = useState(null);
   const [aplicarIva, setAplicarIva] = useState(true);
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
 
   const activos = useMemo(
     () => productos.filter((producto) => producto.activo !== false),
@@ -272,7 +275,7 @@ export default function PaginaPOS() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="min-w-0 space-y-3">
           <Tarjeta className="p-3">
-            <div className="grid gap-2 sm:grid-cols-[1.5fr_1fr]">
+            <div className="grid gap-2 sm:grid-cols-[1.5fr_1fr_auto]">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
                 <Entrada
@@ -294,8 +297,39 @@ export default function PaginaPOS() {
                   </option>
                 ))}
               </Selector>
+              <Boton
+                variante="secundario"
+                onClick={() => setEscanerAbierto(true)}
+                title="Escanear con cámara"
+              >
+                <Camera className="h-4 w-4" />
+                <span className="hidden sm:inline">Escanear</span>
+              </Boton>
             </div>
           </Tarjeta>
+
+          <ModalEscanerCamara
+            abierto={escanerAbierto}
+            onCerrar={() => setEscanerAbierto(false)}
+            onScan={(codigo) => {
+              setBusqueda(codigo);
+              const encontrado = activos.find(
+                (p) =>
+                  p.sku.toLowerCase() === codigo.toLowerCase() ||
+                  (p.variantes || []).some((v) => v.sku.toLowerCase() === codigo.toLowerCase())
+              );
+              if (encontrado) {
+                if ((encontrado.variantes || []).length > 0) {
+                  setProductoVariante(encontrado);
+                } else {
+                  agregar(encontrado);
+                }
+                toast.success(`Producto agregado: ${encontrado.nombre}`);
+              } else {
+                toast.info(`Código escaneado: ${codigo}`);
+              }
+            }}
+          />
 
           {activos.length === 0 ? (
             <Tarjeta>

@@ -2,8 +2,8 @@ import Dexie from "dexie";
 import { NOMBRE_BASE_DATOS, CLAVES_AJUSTES, SECUENCIAS } from "@/lib/utilidades/constantes";
 
 class BaseDatosInventaVen extends Dexie {
-  constructor() {
-    super(NOMBRE_BASE_DATOS);
+  constructor(sufijo = "public") {
+    super(`${NOMBRE_BASE_DATOS}_${sufijo}`);
     this.version(1).stores({
       productos:
         "id, sku, nombre, categoria, activo, creadoEn, actualizadoEn, fechaRenovacion",
@@ -15,7 +15,20 @@ class BaseDatosInventaVen extends Dexie {
   }
 }
 
-export const db = typeof window !== "undefined" ? new BaseDatosInventaVen() : null;
+export let db = typeof window !== "undefined" ? new BaseDatosInventaVen("public") : null;
+
+export async function configurarBaseDatosUsuario(userId) {
+  if (typeof window === "undefined") return;
+  const sufijo = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, "_") : "public";
+  if (db && db.isOpen()) {
+    await db.close();
+  }
+  db = new BaseDatosInventaVen(sufijo);
+  if (!db.isOpen()) {
+    await db.open();
+  }
+  return db;
+}
 
 export function obtenerDb() {
   if (!db) {

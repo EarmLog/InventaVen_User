@@ -8,7 +8,7 @@ import { ProveedorTasa, useTasa } from "@/context/TasaContext";
 import { useSesion } from "@/context/SesionContext";
 import BarraLateral from "@/components/layout/BarraLateral";
 import BarraSuperior from "@/components/layout/BarraSuperior";
-import { asegurarDatosIniciales } from "@/lib/db/baseDatos";
+import { asegurarDatosIniciales, configurarBaseDatosUsuario } from "@/lib/db/baseDatos";
 import {
   actualizarPreciosPorTasa,
   obtenerAjustes,
@@ -44,13 +44,16 @@ function ContenidoPanel({ children }) {
 
   useEffect(() => {
     if (!sesion) return;
-    asegurarDatosIniciales().catch(() => null);
-    refrescarPerfil();
-    if (sesion.user?.email === "demo.inventaven2026@gmail.com") {
-      import("@/lib/db/demoSemilla").then(({ sembrarDatosDemo }) => {
-        sembrarDatosDemo().catch(() => null);
-      });
-    }
+    const userId = sesion.user?.id || "public";
+    configurarBaseDatosUsuario(userId).then(() => {
+      asegurarDatosIniciales().catch(() => null);
+      refrescarPerfil();
+      if (sesion.user?.email === "demo.inventaven2026@gmail.com") {
+        import("@/lib/db/demoSemilla").then(({ sembrarDatosDemo }) => {
+          sembrarDatosDemo().catch(() => null);
+        });
+      }
+    });
   }, [sesion, refrescarPerfil]);
 
   useEffect(() => {
