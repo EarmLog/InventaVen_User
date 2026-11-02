@@ -42,6 +42,7 @@ import {
   formatearVes,
   redondear,
 } from "@/lib/utilidades/formato";
+import { buscarPorCodigo } from "@/lib/utilidades/codigos";
 
 export default function PaginaPOS() {
   const { tasa } = useTasa();
@@ -74,10 +75,12 @@ export default function PaginaPOS() {
         !termino ||
         producto.nombre.toLowerCase().includes(termino) ||
         producto.sku.toLowerCase().includes(termino) ||
+        String(producto.codigoBarras || "").toLowerCase().includes(termino) ||
         (producto.variantes || []).some(
           (variante) =>
             variante.nombre.toLowerCase().includes(termino) ||
-            variante.sku.toLowerCase().includes(termino)
+            variante.sku.toLowerCase().includes(termino) ||
+            String(variante.codigoBarras || "").toLowerCase().includes(termino)
         );
       const coincideCategoria =
         categoria === "todas" || producto.categoria === categoria;
@@ -187,6 +190,27 @@ export default function PaginaPOS() {
     });
     setProductoVariante(null);
     toast.success(`${producto.nombre} agregado al carrito.`, { duration: 1200 });
+  }
+
+  function procesarCodigoEscaneado(codigo) {
+    const limpio = String(codigo || "").trim();
+    if (!limpio) return;
+    setBusqueda(limpio);
+    const encontrado = buscarPorCodigo(activos, limpio);
+    if (!encontrado) {
+      toast.warning(`El código ${limpio} no está registrado en el inventario.`);
+      return;
+    }
+    const { producto, variante } = encontrado;
+    if (variante) {
+      agregar(producto, variante);
+      return;
+    }
+    if ((producto.variantes || []).length > 0) {
+      setProductoVariante(producto);
+      return;
+    }
+    agregar(producto);
   }
 
   function alTocarProducto(producto) {
@@ -322,47 +346,14 @@ export default function PaginaPOS() {
           <ModalEscanerCamara
             abierto={escanerAbierto}
             onCerrar={() => setEscanerAbierto(false)}
-            onScan={(codigo) => {
-              setBusqueda(codigo);
-              const encontrado = activos.find(
-                (p) =>
-                  p.sku.toLowerCase() === codigo.toLowerCase() ||
-                  (p.variantes || []).some((v) => v.sku.toLowerCase() === codigo.toLowerCase())
-              );
-              if (encontrado) {
-                if ((encontrado.variantes || []).length > 0) {
-                  setProductoVariante(encontrado);
-                } else {
-                  agregar(encontrado);
-                }
-                toast.success(`Producto agregado: ${encontrado.nombre}`);
-              } else {
-                toast.info(`Código escaneado: ${codigo}`);
-              }
-            }}
+            onScan={procesarCodigoEscaneado}
           />
 
           <ModalEmparejamientoQR
             abierto={qrAbierto}
             onCerrar={() => setQrAbierto(false)}
-            onScan={(codigo) => {
-              setBusqueda(codigo);
-              const encontrado = activos.find(
-                (p) =>
-                  p.sku.toLowerCase() === codigo.toLowerCase() ||
-                  (p.variantes || []).some((v) => v.sku.toLowerCase() === codigo.toLowerCase())
-              );
-              if (encontrado) {
-                if ((encontrado.variantes || []).length > 0) {
-                  setProductoVariante(encontrado);
-                } else {
-                  agregar(encontrado);
-                }
-                toast.success(`Producto agregado desde móvil: ${encontrado.nombre}`);
-              } else {
-                toast.info(`Código escaneado desde móvil: ${codigo}`);
-              }
-            }}
+            onScan={procesarCodigoEscaneado}
+            cerrarAlEscanear={false}
           />
 
           {activos.length === 0 ? (

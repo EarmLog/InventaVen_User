@@ -27,6 +27,14 @@ function validarBaseDatos() {
   return db;
 }
 
+function normalizarSku(valor) {
+  return String(valor || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "-")
+    .slice(0, 60);
+}
+
 export async function obtenerAjustes() {
   if (!db) return {};
   const filas = await db.ajustes.toArray();
@@ -109,7 +117,18 @@ export async function guardarProducto(datos) {
   return db.transaction("rw", db.productos, db.secuencias, async () => {
     const existente = datos.id ? await db.productos.get(datos.id) : null;
     const id = datos.id || generarId();
+    const skuSolicitado = normalizarSku(datos.sku);
     let sku = existente?.sku;
+
+    if (skuSolicitado && skuSolicitado !== sku) {
+      const duplicado = await db.productos.where("sku").equals(skuSolicitado).first();
+      if (duplicado && duplicado.id !== id) {
+        throw new Error(
+          `El código "${skuSolicitado}" ya está registrado en "${duplicado.nombre}".`
+        );
+      }
+      sku = skuSolicitado;
+    }
 
     if (!sku) {
       const { codigo } = await siguienteSecuenciaEnTransaccion(

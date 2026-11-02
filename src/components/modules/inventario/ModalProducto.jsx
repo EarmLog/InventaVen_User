@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { Camera, Plus, QrCode, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
@@ -11,8 +11,11 @@ import Selector from "@/components/ui/Selector";
 import Interruptor from "@/components/ui/Interruptor";
 import Alerta from "@/components/ui/Alerta";
 import Etiqueta from "@/components/ui/Etiqueta";
+import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
+import ModalEmparejamientoQR from "@/components/ui/ModalEmparejamientoQR";
 import { guardarProducto } from "@/lib/db/repositorios";
 import { db } from "@/lib/db/baseDatos";
+import { reproducirPitidoExito } from "@/lib/utilidades/audio";
 import {
   CATEGORIAS_SUGERIDAS,
   SECUENCIAS,
@@ -36,6 +39,7 @@ function formularioDesdeProducto(producto) {
   if (!producto) {
     return {
       nombre: "",
+      sku: "",
       descripcion: "",
       categoria: "Otros",
       tipoEmpaque: "unidad",
@@ -56,6 +60,7 @@ function formularioDesdeProducto(producto) {
   }
   return {
     nombre: producto.nombre || "",
+    sku: producto.sku || "",
     descripcion: producto.descripcion || "",
     categoria: producto.categoria || "Otros",
     tipoEmpaque: producto.tipoEmpaque || "unidad",
@@ -87,6 +92,8 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
   const [siguienteNumero, setSiguienteNumero] = useState(1);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [escanerAbierto, setEscanerAbierto] = useState(false);
+  const [qrAbierto, setQrAbierto] = useState(false);
 
   const esEdicion = Boolean(producto?.id);
   const tasaUsada = Number(tasa) || Number(producto?.tasaUsd) || 0;
@@ -159,6 +166,14 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
     }));
   }
 
+  function aplicarCodigoEscaneado(codigo) {
+    const limpio = String(codigo || "").trim();
+    if (!limpio) return;
+    cambiar("sku", limpio);
+    reproducirPitidoExito();
+    toast.success(`Código capturado: ${limpio}`);
+  }
+
   async function guardar(evento) {
     evento.preventDefault();
     setError("");
@@ -227,6 +242,7 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
       const guardado = await guardarProducto({
         id: producto?.id,
         nombre: formulario.nombre.trim(),
+        sku: formulario.sku,
         descripcion: formulario.descripcion,
         categoria: formulario.categoria,
         tipoEmpaque: formulario.tipoEmpaque,
@@ -259,8 +275,9 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
   }
 
   return (
-    <Modal
-      abierto={abierto}
+    <>
+      <Modal
+        abierto={abierto}
       onCerrar={onCerrar}
       titulo={esEdicion ? "Editar producto" : "Registrar producto"}
       descripcion="Los cambios se guardan en la base de datos local de este dispositivo."
@@ -311,15 +328,56 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
             </Selector>
           </Campo>
 
-          <div className="flex items-end">
-            <div className="flex w-full items-center gap-2 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] px-3 py-2.5">
-              <Sparkles className="h-4 w-4 text-[var(--primario)]" />
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wide text-[var(--texto-suave)]">
-                  SKU automático
-                </p>
-                <p className="truncate font-mono text-sm font-bold">{skuPreview}</p>
+          <div className="sm:col-span-2">
+            <Campo
+              etiqueta="SKU / Código de barras"
+              ayuda={
+                esEdicion
+                  ? "Escanea o escribe el código para reemplazar el SKU actual."
+                  : "Escanea el código de barras del empaque o déjalo vacío para generar uno automático."
+              }
+            >
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Entrada
+                  value={formulario.sku}
+                  onChange={(evento) => cambiar("sku", evento.target.value)}
+                  placeholder={skuPreview}
+                  maxLength={60}
+                  className="flex-1 font-mono uppercase"
+                />
+                <div className="flex gap-2">
+                  <Boton
+                    variante="secundario"
+                    onClick={() => setEscanerAbierto(true)}
+                    title="Escanear con cámara"
+                  >
+                    <Camera className="h-4 w-4" />
+                    <span className="hidden sm:inline">Cámara</span>
+                  </Boton>
+                  <Boton
+                    variante="secundario"
+                    onClick={() => setQrAbierto(true)}
+                    title="Conectar escáner móvil (QR)"
+                  >
+                    <QrCode className="h-4 w-4 text-[var(--primario)]" />
+                    <span className="hidden sm:inline">Móvil QR</span>
+                  </Boton>
+                </div>
               </div>
+            </Campo>
+            <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--texto-suave)]">
+              <Sparkles className="h-3.5 w-3.5 text-[var(--primario)]" />
+              {formulario.sku ? (
+                <span>
+                  Se guardará como código del producto:{" "}
+                  <span className="font-mono font-semibold">{formulario.sku}</span>
+                </span>
+              ) : (
+                <span>
+                  SKU automático sugerido:{" "}
+                  <span className="font-mono font-semibold">{skuPreview}</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -625,6 +683,23 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
           descripcion="Los productos inactivos no aparecen en el punto de venta."
         />
       </form>
-    </Modal>
+      </Modal>
+
+      <ModalEscanerCamara
+        abierto={escanerAbierto}
+        onCerrar={() => setEscanerAbierto(false)}
+        onScan={(codigo) => {
+          aplicarCodigoEscaneado(codigo);
+          setEscanerAbierto(false);
+        }}
+      />
+
+      <ModalEmparejamientoQR
+        abierto={qrAbierto}
+        onCerrar={() => setQrAbierto(false)}
+        onScan={aplicarCodigoEscaneado}
+        cerrarAlEscanear={false}
+      />
+    </>
   );
 }

@@ -94,11 +94,13 @@ export default function PaginaInventario() {
         !termino ||
         producto.nombre.toLowerCase().includes(termino) ||
         producto.sku.toLowerCase().includes(termino) ||
+        String(producto.codigoBarras || "").toLowerCase().includes(termino) ||
         producto.categoria?.toLowerCase().includes(termino) ||
         (producto.variantes || []).some(
           (variante) =>
             variante.nombre.toLowerCase().includes(termino) ||
-            variante.sku.toLowerCase().includes(termino)
+            variante.sku.toLowerCase().includes(termino) ||
+            String(variante.codigoBarras || "").toLowerCase().includes(termino)
         );
       const coincideCategoria = categoria === "todas" || producto.categoria === categoria;
       let coincideFiltro = true;

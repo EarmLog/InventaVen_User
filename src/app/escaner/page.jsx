@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { CheckCircle2, QrCode, Smartphone, Wifi } from "lucide-react";
 import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
+import { reproducirPitidoExito } from "@/lib/utilidades/audio";
 
 function ContenidoEscanerMovil() {
   const searchParams = useSearchParams();
   const canalId = searchParams.get("canal");
   const [estado, setEstado] = useState("conectando");
   const [ultimoCodigo, setUltimoCodigo] = useState("");
+  const ultimoEnvio = useRef({ codigo: "", momento: 0 });
 
   useEffect(() => {
     if (!canalId) return;
@@ -25,20 +27,45 @@ function ContenidoEscanerMovil() {
 
     const scanner = new Html5QrcodeScanner(
       "reader-mobile-scanner",
-      { fps: 15, qrbox: { width: 260, height: 160 } },
+      {
+        fps: 15,
+        qrbox: { width: 280, height: 180 },
+        rememberLastUsedCamera: true,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      },
       false
     );
 
     scanner.render(
       async (decodedText) => {
-        setUltimoCodigo(decodedText);
+        const codigo = String(decodedText || "").trim();
+        if (!codigo) return;
+        const ahora = Date.now();
+        if (
+          ultimoEnvio.current.codigo === codigo &&
+          ahora - ultimoEnvio.current.momento < 1800
+        ) {
+          return;
+        }
+        ultimoEnvio.current = { codigo, momento: ahora };
+
+        reproducirPitidoExito();
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(80);
+        }
+
+        setUltimoCodigo(codigo);
         setEstado("enviando");
-        await canal.send({
-          type: "broadcast",
-          event: "codigo-escaneado",
-          payload: { codigo: decodedText },
-        });
-        setEstado("enviado");
+        try {
+          await canal.send({
+            type: "broadcast",
+            event: "codigo-escaneado",
+            payload: { codigo },
+          });
+          setEstado("enviado");
+        } catch {
+          setEstado("listo");
+        }
         setTimeout(() => setEstado("listo"), 1200);
       },
       () => {}

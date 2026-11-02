@@ -2,26 +2,41 @@
 
 import { useEffect, useRef } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import { Camera, X } from "lucide-react";
 import Modal from "@/components/ui/Modal";
+import { reproducirPitidoExito } from "@/lib/utilidades/audio";
 
 export default function ModalEscanerCamara({ abierto, onCerrar, onScan }) {
   const scannerRef = useRef(null);
+  const onScanRef = useRef(onScan);
+  const onCerrarRef = useRef(onCerrar);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onCerrarRef.current = onCerrar;
+  }, [onScan, onCerrar]);
 
   useEffect(() => {
     if (!abierto) return;
 
     const scanner = new Html5QrcodeScanner(
       "reader-scanner",
-      { fps: 10, qrbox: { width: 250, height: 150 } },
+      {
+        fps: 10,
+        qrbox: { width: 260, height: 160 },
+        rememberLastUsedCamera: true,
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      },
       false
     );
 
     scanner.render(
       (decodedText) => {
+        const codigo = String(decodedText || "").trim();
+        if (!codigo) return;
         scanner.clear().catch(() => null);
-        onScan(decodedText);
-        onCerrar();
+        reproducirPitidoExito();
+        onScanRef.current?.(codigo);
+        onCerrarRef.current?.();
       },
       () => {
         // Ignorar errores menores de escaneo continuo por fotograma
@@ -33,7 +48,7 @@ export default function ModalEscanerCamara({ abierto, onCerrar, onScan }) {
     return () => {
       scanner.clear().catch(() => null);
     };
-  }, [abierto, onCerrar]);
+  }, [abierto]);
 
   return (
     <Modal
