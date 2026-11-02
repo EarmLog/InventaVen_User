@@ -1,9 +1,10 @@
 "use client";
 
-import { Printer, ReceiptText } from "lucide-react";
+import { Printer, ReceiptText, ScrollText } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
 import { TIPOS_PAGO } from "@/lib/utilidades/constantes";
+import { imprimirTicketTermico } from "@/lib/utilidades/impresora";
 import {
   formatearFechaHora,
   formatearNumero,
@@ -23,12 +24,16 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
       abierto={abierto}
       onCerrar={onCerrar}
       titulo={`Factura ${venta.numeroFactura}`}
-      descripcion="Venta registrada correctamente. Puedes imprimir o guardar el comprobante."
+      descripcion="Venta registrada correctamente. Puedes imprimir ticket térmico o factura."
       ancho="lg"
       pie={
         <>
           <Boton variante="secundario" onClick={onCerrar}>
             Nueva venta
+          </Boton>
+          <Boton variante="secundario" onClick={() => imprimirTicketTermico(venta, perfil)}>
+            <ScrollText className="h-4 w-4" />
+            Ticket Térmico (58mm)
           </Boton>
           <Boton onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
