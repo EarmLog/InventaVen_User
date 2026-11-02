@@ -48,6 +48,7 @@ export const CLAVES_AJUSTES = {
   TASA_ACTUALIZADA_EN: "tasaActualizadaEn",
   ULTIMA_ACTUALIZACION_PRECIOS: "ultimaActualizacionPrecios",
   NOMBRE_NEGOCIO: "nombreNegocio",
+  SINC_NUBE: "sincronizacionNube",
 };
 
 export const SECUENCIAS = {

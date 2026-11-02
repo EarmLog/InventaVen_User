@@ -190,6 +190,8 @@ export async function guardarProducto(datos) {
       creadoEn: existente?.creadoEn || ahora,
       actualizadoEn: ahora,
       fechaRenovacion: existente?.fechaRenovacion || ahora,
+      proveedorId: datos.proveedorId || null,
+      proveedorNombre: datos.proveedorNombre || null,
     };
 
     const variantes = normalizarVariantes(productoBase, existente?.variantes || []);
@@ -372,6 +374,7 @@ export async function registrarVenta({
           nombre: producto.nombre,
           variante: variante?.nombre || null,
           sku: variante?.sku || producto.sku,
+          categoria: producto.categoria || "Otros",
           tipoEmpaque: producto.tipoEmpaque,
           unidadesPorBulto: producto.unidadesPorBulto,
           cantidad,
@@ -719,4 +722,74 @@ export function calcularResumenGanancia(producto, tasaUsd = 0) {
     producto?.precioVentaUsd,
     tasaUsd || producto?.tasaUsd
   );
+}
+
+export async function guardarFacturaFiscal(fiscal) {
+  validarBaseDatos();
+  if (!fiscal) throw new Error("La factura fiscal no es válida.");
+  return db.facturasFiscales.put(fiscal);
+}
+
+export async function listarFacturasFiscales() {
+  validarBaseDatos();
+  return db.facturasFiscales.orderBy("fecha").reverse().toArray();
+}
+
+export async function registrarAuditoria({
+  usuarioId = "local",
+  accion,
+  entidad,
+  entidadId = null,
+  detalle = "",
+}) {
+  validarBaseDatos();
+  if (!accion || !entidad) throw new Error("La auditoría requiere acción y entidad.");
+  const ahora = new Date().toISOString();
+  const registro = {
+    id: generarId(),
+    usuarioId,
+    accion,
+    entidad,
+    entidadId,
+    fecha: ahora,
+    detalle: detalle || "",
+  };
+  await db.auditorias.add(registro);
+  return registro;
+}
+
+export async function listarAuditorias({ usuarioId = "local" } = {}) {
+  validarBaseDatos();
+  const coleccion = db.auditorias;
+  const registros = await (usuarioId
+    ? coleccion.where("usuarioId").equals(usuarioId).toArray()
+    : coleccion.toArray());
+  return registros.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+}
+
+export async function registrarOperacionEspeciale({
+  tipo,
+  entidadId = null,
+  entidadTipo = null,
+  detalle = "",
+}) {
+  validarBaseDatos();
+  if (!tipo) throw new Error("La operación especial requiere un tipo.");
+  const ahora = new Date().toISOString();
+  const registro = {
+    id: generarId(),
+    tipo,
+    entidadId,
+    entidadTipo,
+    fecha: ahora,
+    detalle: detalle || "",
+    estado: "registrada",
+  };
+  await db.operacionesEspeciales.add(registro);
+  return registro;
+}
+
+export async function listarOperacionesEspeciales() {
+  validarBaseDatos();
+  return db.operacionesEspeciales.orderBy("fecha").reverse().toArray();
 }

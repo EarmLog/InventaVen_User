@@ -4,13 +4,19 @@ import { NOMBRE_BASE_DATOS, CLAVES_AJUSTES, SECUENCIAS } from "@/lib/utilidades/
 class BaseDatosInventaVen extends Dexie {
   constructor(sufijo = "public") {
     super(`${NOMBRE_BASE_DATOS}_${sufijo}`);
-    this.version(1).stores({
+    this.version(2).stores({
       productos:
         "id, sku, nombre, categoria, activo, creadoEn, actualizadoEn, fechaRenovacion",
       ventas: "id, codigo, numeroFactura, fecha, estado, tipoPago, creadoEn",
       ajustes: "clave",
       secuencias: "nombre",
       movimientos: "id, productoId, varianteId, tipo, fecha",
+      facturasFiscales:
+        "id, ventaId, tipo, estado, fecha, totalUsd, createdAt, updatedAt",
+      auditorias:
+        "id, usuarioId, accion, entidad, entidadId, fecha, detalle",
+      operacionesEspeciales:
+        "id, tipo, entidadId, entidadTipo, fecha, detalle, estado",
     });
   }
 }

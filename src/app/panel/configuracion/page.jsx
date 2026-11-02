@@ -72,6 +72,7 @@ export default function PaginaConfiguracion() {
   const autoPrecios = Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_PRECIOS_AUTO]);
   const ultimaActualizacion = ajustes[CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS];
   const diasLicencia = Number(perfil?.diasLicencia ?? 0);
+  const sincronizacionNube = Boolean(ajustes[CLAVES_AJUSTES.SINC_NUBE]);
 
   useEffect(() => {
     setNombreNegocio(perfil?.nombreNegocio || "");
@@ -102,6 +103,19 @@ export default function PaginaConfiguracion() {
         activo
           ? "Actualización automática activada. Se aplicará con la tasa vigente."
           : "Actualización automática desactivada."
+      );
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  async function alternarSincronizacionNube(activo) {
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.SINC_NUBE, activo);
+      toast.success(
+        activo
+          ? "Sincronización en la nube habilitada."
+          : "Sincronización en la nube deshabilitada."
       );
     } catch (error) {
       toast.error(error.message);
@@ -371,6 +385,12 @@ export default function PaginaConfiguracion() {
               accept=".zip,application/zip"
               className="hidden"
               onChange={seleccionarRespaldo}
+            />
+            <Interruptor
+              activo={sincronizacionNube}
+              onCambio={alternarSincronizacionNube}
+              etiqueta="Sincronización con la nube"
+              descripcion="Permite activar el respaldo opcional en la nube para este dispositivo."
             />
           </div>
           <Alerta tipo="advertencia" className="mt-3">

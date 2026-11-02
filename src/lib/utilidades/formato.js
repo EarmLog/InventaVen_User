@@ -71,6 +71,24 @@ export function inicioDelDia(fecha) {
   return valor;
 }
 
+export function inicioDeSemana(fecha) {
+  const valor = inicioDelDia(fecha);
+  const dia = valor.getDay();
+  const diferencia = dia === 0 ? -6 : 1 - dia;
+  valor.setDate(valor.getDate() + diferencia);
+  return valor;
+}
+
+export function inicioDeMes(fecha) {
+  const valor = new Date(fecha);
+  return new Date(valor.getFullYear(), valor.getMonth(), 1);
+}
+
+export function finDeMes(fecha) {
+  const valor = new Date(fecha);
+  return new Date(valor.getFullYear(), valor.getMonth() + 1, 0);
+}
+
 export function finDelDia(fecha) {
   const valor = new Date(fecha);
   valor.setHours(23, 59, 59, 999);

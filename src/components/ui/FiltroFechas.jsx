@@ -1,12 +1,67 @@
 "use client";
 
 import { CalendarDays } from "lucide-react";
-import { fechaParaInput, inicioDelDia } from "@/lib/utilidades/formato";
+import {
+  fechaParaInput,
+  inicioDelDia,
+  sumarDias,
+} from "@/lib/utilidades/formato";
+
+function rangoUltimosDias(dias) {
+  const fin = new Date();
+  const inicio = inicioDelDia(fin);
+  inicio.setDate(inicio.getDate() - dias);
+  return { desde: fechaParaInput(inicio), hasta: fechaParaInput(fin) };
+}
 
 const PRESETS = [
-  { etiqueta: "7 días", dias: 6 },
-  { etiqueta: "30 días", dias: 29 },
-  { etiqueta: "90 días", dias: 89 },
+  {
+    etiqueta: "Hoy",
+    rango: () => {
+      const hoy = fechaParaInput();
+      return { desde: hoy, hasta: hoy };
+    },
+  },
+  {
+    etiqueta: "Ayer",
+    rango: () => {
+      const ayer = fechaParaInput(sumarDias(new Date(), -1));
+      return { desde: ayer, hasta: ayer };
+    },
+  },
+  { etiqueta: "7 días", rango: () => rangoUltimosDias(6) },
+  { etiqueta: "30 días", rango: () => rangoUltimosDias(29) },
+  { etiqueta: "90 días", rango: () => rangoUltimosDias(89) },
+  {
+    etiqueta: "Este mes",
+    rango: () => {
+      const hoy = new Date();
+      return {
+        desde: fechaParaInput(new Date(hoy.getFullYear(), hoy.getMonth(), 1)),
+        hasta: fechaParaInput(hoy),
+      };
+    },
+  },
+  {
+    etiqueta: "Mes pasado",
+    rango: () => {
+      const hoy = new Date();
+      return {
+        desde: fechaParaInput(new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)),
+        hasta: fechaParaInput(new Date(hoy.getFullYear(), hoy.getMonth(), 0)),
+      };
+    },
+  },
+  {
+    etiqueta: "Este año",
+    rango: () => {
+      const hoy = new Date();
+      return {
+        desde: fechaParaInput(new Date(hoy.getFullYear(), 0, 1)),
+        hasta: fechaParaInput(hoy),
+      };
+    },
+  },
 ];
 
 export default function FiltroFechas({
@@ -20,17 +75,9 @@ export default function FiltroFechas({
     onCambiar({ desde: nuevaDesde, hasta: nuevaHasta });
   }
 
-  function aplicarPreset(dias) {
-    const fin = new Date();
-    const inicio = inicioDelDia(fin);
-    inicio.setDate(inicio.getDate() - dias);
-    aplicarRango(fechaParaInput(inicio), fechaParaInput(fin));
-  }
-
-  function aplicarMesActual() {
-    const hoy = new Date();
-    const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-    aplicarRango(fechaParaInput(inicio), fechaParaInput(hoy));
+  function aplicarPreset(preset) {
+    const rango = preset.rango();
+    aplicarRango(rango.desde, rango.hasta);
   }
 
   return (
@@ -73,19 +120,12 @@ export default function FiltroFechas({
           <button
             key={preset.etiqueta}
             type="button"
-            onClick={() => aplicarPreset(preset.dias)}
+            onClick={() => aplicarPreset(preset)}
             className="rounded-lg border border-[var(--borde)] bg-[var(--superficie-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--texto-suave)] transition hover:border-[var(--primario)]/40 hover:text-[var(--texto)]"
           >
             {preset.etiqueta}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={aplicarMesActual}
-          className="rounded-lg border border-[var(--borde)] bg-[var(--superficie-2)] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--texto-suave)] transition hover:border-[var(--primario)]/40 hover:text-[var(--texto)]"
-        >
-          Este mes
-        </button>
       </div>
     </div>
   );
