@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { consumirTicket } from "@/lib/captcha";
 import { traducirErrorAuth } from "@/lib/api/auth";
+import {
+  claveIp,
+  limitar,
+  reiniciarLimite,
+  segundosParaReintentar,
+} from "@/lib/seguridad/limiteIntentos";
 
 export const dynamic = "force-dynamic";
+
+const VENTANA_MS = 5 * 60 * 1000;
 
 export async function POST(request) {
   try {
@@ -15,6 +23,25 @@ export async function POST(request) {
     const contrasena =
       typeof cuerpo?.contrasena === "string" ? cuerpo.contrasena.slice(0, 200) : "";
     const captcha = typeof cuerpo?.captcha === "string" ? cuerpo.captcha : "";
+
+    const limiteIp = limitar(claveIp(request), 30, VENTANA_MS);
+    const limiteCuenta = correo
+      ? limitar(`cuenta:${correo}`, 8, VENTANA_MS)
+      : { permitido: true, reinicio: Date.now() };
+
+    if (!limiteIp.permitido || !limiteCuenta.permitido) {
+      const resultado = !limiteIp.permitido ? limiteIp : limiteCuenta;
+      return NextResponse.json(
+        { error: "Demasiados intentos. Espera unos minutos e intenta de nuevo." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(segundosParaReintentar(resultado)),
+            "Cache-Control": "no-store",
+          },
+        }
+      );
+    }
 
     if (!captcha || !consumirTicket(captcha)) {
       return NextResponse.json(
@@ -58,6 +85,9 @@ export async function POST(request) {
         { status: 401 }
       );
     }
+
+    reiniciarLimite(`cuenta:${correo}`);
+    reiniciarLimite(claveIp(request));
 
     return NextResponse.json(
       {

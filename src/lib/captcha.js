@@ -81,7 +81,6 @@ export function crearDesafio() {
     id,
     expiraEn,
     huella: calcularHuella(id, operacion.respuesta),
-    respuesta: operacion.respuesta,
   });
 
   return {

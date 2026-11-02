@@ -40,6 +40,7 @@ export default function PaginaLogin() {
       router.replace("/panel");
     } catch (err) {
       setError(err.message);
+      setContrasena("");
       setCaptchaTicket("");
       setVersionCaptcha((valor) => valor + 1);
     } finally {
@@ -80,6 +81,9 @@ export default function PaginaLogin() {
             onChange={(evento) => setCorreo(evento.target.value)}
             placeholder="tu@negocio.com"
             autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={254}
             required
           />
         </Campo>
@@ -93,6 +97,7 @@ export default function PaginaLogin() {
               placeholder="Tu contraseña"
               className="pr-10"
               autoComplete="current-password"
+              maxLength={200}
               required
             />
             <button

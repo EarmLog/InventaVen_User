@@ -11,6 +11,7 @@ import Entrada from "@/components/ui/Entrada";
 import Alerta from "@/components/ui/Alerta";
 import Cargando from "@/components/ui/Cargando";
 import { useSesion } from "@/context/SesionContext";
+import { validarContrasena } from "@/lib/seguridad/contrasena";
 
 export default function PaginaActualizarClave() {
   const { sesion, cambiarClave } = useSesion();
@@ -20,7 +21,7 @@ export default function PaginaActualizarClave() {
   const [verClave, setVerClave] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-  const [segundos, setSegundos] = useState(6);
+  const [segundos, setSegundos] = useState(15);
 
   useEffect(() => {
     if (sesion !== null || segundos <= 0) return undefined;
@@ -31,8 +32,9 @@ export default function PaginaActualizarClave() {
   async function enviar(evento) {
     evento.preventDefault();
     setError("");
-    if (nueva.length < 6) {
-      setError("La nueva contraseña debe tener al menos 6 caracteres.");
+    const errorClave = validarContrasena(nueva);
+    if (errorClave) {
+      setError(errorClave);
       return;
     }
     if (nueva !== confirmar) {
@@ -98,8 +100,9 @@ export default function PaginaActualizarClave() {
               value={nueva}
               onChange={(evento) => setNueva(evento.target.value)}
               className="pl-9 pr-10"
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres, con letra y número"
               autoComplete="new-password"
+              maxLength={200}
               required
             />
             <button
@@ -119,6 +122,7 @@ export default function PaginaActualizarClave() {
             onChange={(evento) => setConfirmar(evento.target.value)}
             placeholder="Repite la nueva contraseña"
             autoComplete="new-password"
+            maxLength={200}
             required
           />
         </Campo>

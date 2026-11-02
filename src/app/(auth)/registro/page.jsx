@@ -18,6 +18,7 @@ import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
 import Alerta from "@/components/ui/Alerta";
 import { useSesion } from "@/context/SesionContext";
+import { validarContrasena } from "@/lib/seguridad/contrasena";
 
 export default function PaginaRegistro() {
   const { sesion, registrarUsuario } = useSesion();
@@ -54,8 +55,9 @@ export default function PaginaRegistro() {
       setError("Escribe un correo electrónico.");
       return;
     }
-    if (formulario.contrasena.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
+    const errorClave = validarContrasena(formulario.contrasena);
+    if (errorClave) {
+      setError(errorClave);
       return;
     }
     if (formulario.contrasena !== formulario.confirmar) {
@@ -123,6 +125,9 @@ export default function PaginaRegistro() {
               placeholder="tu@negocio.com"
               className="pl-9"
               autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={254}
               required
             />
           </div>
@@ -150,9 +155,10 @@ export default function PaginaRegistro() {
                 type={verClave ? "text" : "password"}
                 value={formulario.contrasena}
                 onChange={(evento) => cambiar("contrasena", evento.target.value)}
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 8 caracteres, con letra y número"
                 className="pl-9 pr-9"
                 autoComplete="new-password"
+                maxLength={200}
                 required
               />
               <button
@@ -171,10 +177,11 @@ export default function PaginaRegistro() {
               type={verClave ? "text" : "password"}
               value={formulario.confirmar}
               onChange={(evento) => cambiar("confirmar", evento.target.value)}
-              placeholder="Repite la contraseña"
-              autoComplete="new-password"
-              required
-            />
+            placeholder="Repite la contraseña"
+            autoComplete="new-password"
+            maxLength={200}
+            required
+          />
           </Campo>
         </div>
 
