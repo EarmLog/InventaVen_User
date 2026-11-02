@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
@@ -74,33 +74,24 @@ export default function PaginaLogin() {
         {error ? <Alerta tipo="error">{error}</Alerta> : null}
 
         <Campo etiqueta="Correo electrónico" requerido>
-          <div className="relative">
-            {!correo ? (
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
-            ) : null}
-            <Entrada
-              type="email"
-              value={correo}
-              onChange={(evento) => setCorreo(evento.target.value)}
-              placeholder="tu@negocio.com"
-              className={correo ? "pl-3" : "pl-10"}
-              autoComplete="email"
-              required
-            />
-          </div>
+          <Entrada
+            type="email"
+            value={correo}
+            onChange={(evento) => setCorreo(evento.target.value)}
+            placeholder="tu@negocio.com"
+            autoComplete="email"
+            required
+          />
         </Campo>
 
         <Campo etiqueta="Contraseña" requerido>
           <div className="relative">
-            {!contrasena ? (
-              <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
-            ) : null}
             <Entrada
               type={verClave ? "text" : "password"}
               value={contrasena}
               onChange={(evento) => setContrasena(evento.target.value)}
               placeholder="Tu contraseña"
-              className={contrasena ? "pl-3 pr-10" : "pl-10 pr-10"}
+              className="pr-10"
               autoComplete="current-password"
               required
             />
