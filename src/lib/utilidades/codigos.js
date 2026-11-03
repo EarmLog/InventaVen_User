@@ -6,6 +6,7 @@ export function coincideConProducto(producto, codigo) {
   const buscado = normalizarCodigo(codigo);
   if (!buscado) return false;
   if (normalizarCodigo(producto?.sku) === buscado) return true;
+  if (normalizarCodigo(producto?.codigoBarra) === buscado) return true;
   if (normalizarCodigo(producto?.codigoBarras) === buscado) return true;
   return false;
 }

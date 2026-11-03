@@ -78,10 +78,10 @@ export default function Fiscalidad() {
 
       exportarExcelReporte(
         datosExportar,
-        "Declaracion_SENIAT",
-        `Declaracion_SENIAT_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.xlsx`
+        "Declaracion_Fiscal",
+        `Declaracion_Fiscal_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.xlsx`
       );
-      toast.success("Reporte Excel para SENIAT generado exitosamente.");
+      toast.success("Reporte Excel para declaración generado exitosamente.");
     } catch (error) {
       console.error(error);
       toast.error("Error al exportar Excel.");
@@ -114,12 +114,12 @@ export default function Fiscalidad() {
       }
 
       exportarPdfReporte({
-        titulo: `Declaración Fiscal / SENIAT (${fechaInicio || "Inicio"} al ${fechaFin || "Hoy"})`,
+        titulo: `Declaración Fiscal y Tributaria (${fechaInicio || "Inicio"} al ${fechaFin || "Hoy"})`,
         columnas: ["Nro / Comprobante", "Fecha", "Tipo", "Base Imp.", "IVA (16%)", "Total"],
         filas,
-        nombreArchivo: `Declaracion_SENIAT_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.pdf`,
+        nombreArchivo: `Declaracion_Fiscal_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.pdf`,
       });
-      toast.success("Reporte PDF para SENIAT generado exitosamente.");
+      toast.success("Reporte PDF para declaración generado exitosamente.");
     } catch (error) {
       console.error(error);
       toast.error("Error al exportar PDF.");
@@ -163,11 +163,11 @@ export default function Fiscalidad() {
           <div className="flex items-center gap-2">
             <Boton variante="secundario" onClick={exportarExcelSeniat} className="inline-flex items-center gap-2">
               <Download className="h-4 w-4" />
-              Exportar Excel SENIAT
+              Exportar Excel (Tributario)
             </Boton>
             <Boton variante="primario" onClick={exportarPdfSeniat} className="inline-flex items-center gap-2">
               <FileText className="h-4 w-4" />
-              Exportar PDF SENIAT
+              Exportar PDF (Tributario)
             </Boton>
           </div>
         </div>

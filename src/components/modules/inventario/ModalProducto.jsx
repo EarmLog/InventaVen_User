@@ -40,6 +40,7 @@ function formularioDesdeProducto(producto) {
     return {
       nombre: "",
       sku: "",
+      codigoBarra: "",
       descripcion: "",
       categoria: "Otros",
       tipoEmpaque: "unidad",
@@ -61,6 +62,7 @@ function formularioDesdeProducto(producto) {
   return {
     nombre: producto.nombre || "",
     sku: producto.sku || "",
+    codigoBarra: producto.codigoBarra || "",
     descripcion: producto.descripcion || "",
     categoria: producto.categoria || "Otros",
     tipoEmpaque: producto.tipoEmpaque || "unidad",
@@ -169,9 +171,9 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
   function aplicarCodigoEscaneado(codigo) {
     const limpio = String(codigo || "").trim();
     if (!limpio) return;
-    cambiar("sku", limpio);
+    cambiar("codigoBarra", limpio);
     reproducirPitidoExito();
-    toast.success(`Código capturado: ${limpio}`);
+    toast.success(`Código de barra capturado: ${limpio}`);
   }
 
   async function guardar(evento) {
@@ -243,6 +245,7 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
         id: producto?.id,
         nombre: formulario.nombre.trim(),
         sku: formulario.sku,
+        codigoBarra: formulario.codigoBarra.trim(),
         descripcion: formulario.descripcion,
         categoria: formulario.categoria,
         tipoEmpaque: formulario.tipoEmpaque,
@@ -328,57 +331,52 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
             </Selector>
           </Campo>
 
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
             <Campo
-              etiqueta="SKU / Código de barras"
-              ayuda={
-                esEdicion
-                  ? "Escanea o escribe el código para reemplazar el SKU actual."
-                  : "Escanea el código de barras del empaque o déjalo vacío para generar uno automático."
-              }
+              etiqueta="SKU Interno"
+              ayuda="Código de referencia interno (se genera automático si se deja vacío)."
             >
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <Entrada
+                value={formulario.sku}
+                onChange={(evento) => cambiar("sku", evento.target.value)}
+                placeholder={skuPreview}
+                maxLength={60}
+                className="font-mono uppercase"
+              />
+            </Campo>
+
+            <Campo
+              etiqueta="Código de barras (Escáner / POS)"
+              ayuda="Código de barras escaneable del producto (EAN/UPC)."
+            >
+              <div className="flex gap-2">
                 <Entrada
-                  value={formulario.sku}
-                  onChange={(evento) => cambiar("sku", evento.target.value)}
-                  placeholder={skuPreview}
+                  value={formulario.codigoBarra}
+                  onChange={(evento) => cambiar("codigoBarra", evento.target.value)}
+                  placeholder="Ej. 7591234567890"
                   maxLength={60}
-                  className="flex-1 font-mono uppercase"
+                  className="flex-1 font-mono"
                 />
-                <div className="flex gap-2">
-                  <Boton
-                    variante="secundario"
-                    onClick={() => setEscanerAbierto(true)}
-                    title="Escanear con cámara"
-                  >
-                    <Camera className="h-4 w-4" />
-                    <span className="hidden sm:inline">Cámara</span>
-                  </Boton>
-                  <Boton
-                    variante="secundario"
-                    onClick={() => setQrAbierto(true)}
-                    title="Conectar escáner móvil (QR)"
-                  >
-                    <QrCode className="h-4 w-4 text-[var(--primario)]" />
-                    <span className="hidden sm:inline">Móvil QR</span>
-                  </Boton>
-                </div>
+                <Boton
+                  variante="secundario"
+                  onClick={() => setEscanerAbierto(true)}
+                  title="Escanear con cámara"
+                  className="shrink-0"
+                >
+                  <Camera className="h-4 w-4" />
+                  <span className="hidden sm:inline">Cámara</span>
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={() => setQrAbierto(true)}
+                  title="Conectar escáner móvil (QR)"
+                  className="shrink-0"
+                >
+                  <QrCode className="h-4 w-4 text-[var(--primario)]" />
+                  <span className="hidden sm:inline">QR</span>
+                </Boton>
               </div>
             </Campo>
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--texto-suave)]">
-              <Sparkles className="h-3.5 w-3.5 text-[var(--primario)]" />
-              {formulario.sku ? (
-                <span>
-                  Se guardará como código del producto:{" "}
-                  <span className="font-mono font-semibold">{formulario.sku}</span>
-                </span>
-              ) : (
-                <span>
-                  SKU automático sugerido:{" "}
-                  <span className="font-mono font-semibold">{skuPreview}</span>
-                </span>
-              )}
-            </div>
           </div>
 
           <Campo etiqueta="Descripción (opcional)" className="sm:col-span-2">
