@@ -1,106 +1,236 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Package } from "lucide-react";
+import { Package, Plus, Search, Trash2, Pencil, Phone, Mail, Building2 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
+import { generarId } from "@/lib/utilidades/formato";
+import { toast } from "sonner";
 import Tarjeta from "@/components/ui/Tarjeta";
-import Etiqueta from "@/components/ui/Etiqueta";
+import Boton from "@/components/ui/Boton";
+import Entrada from "@/components/ui/Entrada";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 
 export default function Proveedores() {
-  const productos = useLiveQuery(() => (db ? db.productos.toArray() : []), [], []) || [];
+  const proveedores = useLiveQuery(() => (db ? db.proveedores.toArray() : []), [], []) || [];
+  const [busqueda, setBusqueda] = useState("");
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [proveedorEditando, setProveedorEditando] = useState(null);
+  const [nombre, setNombre] = useState("");
+  const [rif, setRif] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [email, setEmail] = useState("");
+  const [direccion, setDireccion] = useState("");
 
-  const proveedores = useMemo(() => {
-    const mapa = new Map();
-    productos.forEach((producto) => {
-      const clave = producto.proveedorId || producto.proveedorNombre || "Sin proveedor";
-      const actual = mapa.get(clave) || {
-        clave,
-        nombre: producto.proveedorId || producto.proveedorNombre || "Sin proveedor",
-        productos: [],
-      };
-      actual.productos.push(producto);
-      mapa.set(clave, actual);
-    });
-    return [...mapa.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [productos]);
-
-  const totalProductos = proveedores.reduce(
-    (total, proveedor) => total + proveedor.productos.length,
-    0
+  const proveedoresFiltrados = proveedores.filter((p) =>
+    p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (p.rif && p.rif.toLowerCase().includes(busqueda.toLowerCase()))
   );
+
+  const abrirModal = (prov = null) => {
+    if (prov) {
+      setProveedorEditando(prov);
+      setNombre(prov.nombre || "");
+      setRif(prov.rif || "");
+      setTelefono(prov.telefono || "");
+      setEmail(prov.email || "");
+      setDireccion(prov.direccion || "");
+    } else {
+      setProveedorEditando(null);
+      setNombre("");
+      setRif("");
+      setTelefono("");
+      setEmail("");
+      setDireccion("");
+    }
+    setModalAbierto(true);
+  };
+
+  const guardarProveedor = async (e) => {
+    e.preventDefault();
+    if (!nombre.trim()) {
+      toast.error("El nombre del proveedor es obligatorio.");
+      return;
+    }
+    try {
+      if (proveedorEditando) {
+        await db.proveedores.update(proveedorEditando.id, {
+          nombre: nombre.trim(),
+          rif: rif.trim(),
+          telefono: telefono.trim(),
+          email: email.trim(),
+          direccion: direccion.trim(),
+          actualizadoEn: new Date().toISOString(),
+        });
+        toast.success("Proveedor actualizado exitosamente.");
+      } else {
+        await db.proveedores.add({
+          id: generarId(),
+          nombre: nombre.trim(),
+          rif: rif.trim(),
+          telefono: telefono.trim(),
+          email: email.trim(),
+          direccion: direccion.trim(),
+          creadoEn: new Date().toISOString(),
+        });
+        toast.success("Proveedor registrado exitosamente.");
+      }
+      setModalAbierto(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al guardar proveedor.");
+    }
+  };
+
+  const eliminarProveedor = async (id) => {
+    if (!confirm("¿Deseas eliminar este proveedor?")) return;
+    try {
+      await db.proveedores.delete(id);
+      toast.success("Proveedor eliminado.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al eliminar proveedor.");
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Proveedores</h1>
-            <Etiqueta variante="info">
-              <Package className="h-3 w-3" />
-              {proveedores.length} proveedores
-            </Etiqueta>
-          </div>
-          <p className="mt-1 text-sm text-[var(--texto-suave)]">
-            Relación local de productos por proveedor con costos de compra.
-          </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-[var(--texto-suave)]" />
+          <Entrada
+            placeholder="Buscar por nombre o RIF..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        <Boton onClick={() => abrirModal()} variante="primario" className="inline-flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Nuevo proveedor
+        </Boton>
       </div>
 
-      {proveedores.length === 0 ? (
+      {proveedoresFiltrados.length === 0 ? (
         <EstadoVacio
           icono={Package}
-          titulo="Sin proveedores registrados"
-          descripcion="Los productos anotados con proveedor aparecerán aquí."
+          titulo="No hay proveedores registrados"
+          descripcion="Agrega tus proveedores para gestionar compras y reabastecimiento."
         />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {proveedores.map((proveedor) => (
-            <Tarjeta key={proveedor.clave} className="p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="text-sm font-bold">{proveedor.nombre}</h2>
-                <Etiqueta variante="neutra">{proveedor.productos.length} productos</Etiqueta>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {proveedoresFiltrados.map((prov) => (
+            <Tarjeta key={prov.id} className="p-4 flex flex-col justify-between space-y-3">
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="font-bold text-sm">{prov.nombre}</h3>
+                  <span className="rounded-full bg-[var(--superficie-2)] px-2 py-0.5 text-[10px] font-semibold text-[var(--texto-suave)]">
+                    {prov.rif || "Sin RIF"}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1 text-xs text-[var(--texto-suave)]">
+                  {prov.telefono && (
+                    <p className="flex items-center gap-1.5">
+                      <Phone className="h-3 w-3 text-[var(--texto-tenue)]" />
+                      {prov.telefono}
+                    </p>
+                  )}
+                  {prov.email && (
+                    <p className="flex items-center gap-1.5">
+                      <Mail className="h-3 w-3 text-[var(--texto-tenue)]" />
+                      {prov.email}
+                    </p>
+                  )}
+                  {prov.direccion && (
+                    <p className="flex items-center gap-1.5">
+                      <Building2 className="h-3 w-3 text-[var(--texto-tenue)]" />
+                      {prov.direccion}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                {proveedor.productos.map((producto) => (
-                  <div
-                    key={producto.id}
-                    className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--borde)] pb-2 text-[11px] last:border-b-0 last:pb-0"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{producto.nombre}</p>
-                      <p className="text-[10px] text-[var(--texto-suave)]">
-                        SKU: {producto.sku || "—"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[10px] uppercase text-[var(--texto-suave)]">
-                        Costo
-                      </span>
-                      <span className="font-semibold">
-                        {Number(producto.precioCompraUsd || 0).toLocaleString("es-VE", { maximumFractionDigits: 2 })}{" "}
-                        USD
-                      </span>
-                      <span className="font-semibold">
-                        {Number(producto.precioCompraVes || 0).toLocaleString("es-VE", { maximumFractionDigits: 2 })}{" "}
-                        VES
-                      </span>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--borde)]">
+                <button
+                  onClick={() => abrirModal(prov)}
+                  className="p-1.5 rounded-lg hover:bg-[var(--superficie-2)] text-[var(--texto-suave)]"
+                  title="Editar"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => eliminarProveedor(prov.id)}
+                  className="p-1.5 rounded-lg hover:bg-[var(--advertencia-suave)] text-red-600"
+                  title="Eliminar"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             </Tarjeta>
           ))}
         </div>
       )}
 
-      <Tarjeta className="p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold">Total productos anotados</p>
-          <p className="text-lg font-bold">{totalProductos}</p>
+      {modalAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--superficie)] p-6 shadow-xl border border-[var(--borde)] space-y-4">
+            <h2 className="text-lg font-bold">
+              {proveedorEditando ? "Editar proveedor" : "Registrar nuevo proveedor"}
+            </h2>
+            <form onSubmit={guardarProveedor} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-[var(--texto-suave)]">Nombre / Empresa *</label>
+                <Entrada
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  placeholder="Ej. Distribuidora C.A."
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--texto-suave)]">RIF / Cédula</label>
+                <Entrada
+                  value={rif}
+                  onChange={(e) => setRif(e.target.value)}
+                  placeholder="Ej. J-12345678-9"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--texto-suave)]">Teléfono</label>
+                <Entrada
+                  value={telefono}
+                  onChange={(e) => setTelefono(e.target.value)}
+                  placeholder="Ej. 0414-1234567"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--texto-suave)]">Correo electrónico</label>
+                <Entrada
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Ej. contacto@distribuidora.com"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--texto-suave)]">Dirección</label>
+                <Entrada
+                  value={direccion}
+                  onChange={(e) => setDireccion(e.target.value)}
+                  placeholder="Ej. Zona Industrial, Galpón 4"
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-3">
+                <Boton type="button" variante="secundario" onClick={() => setModalAbierto(false)}>
+                  Cancelar
+                </Boton>
+                <Boton type="submit" variante="primario">
+                  Guardar
+                </Boton>
+              </div>
+            </form>
+          </div>
         </div>
-      </Tarjeta>
+      )}
     </div>
   );
 }
