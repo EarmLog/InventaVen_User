@@ -25,6 +25,9 @@ const TITULOS = {
   "/panel/inventario": "Inventario",
   "/panel/pos": "Punto de venta",
   "/panel/analisis": "Análisis de ventas",
+  "/panel/fiscal": "Facturación y fiscalidad",
+  "/panel/proveedores": "Proveedores",
+  "/panel/auditoria": "Auditoría",
   "/panel/pendientes": "Ventas pendientes",
   "/panel/configuracion": "Configuración",
 };
