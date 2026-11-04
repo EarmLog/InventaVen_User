@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
@@ -94,12 +94,11 @@ export default function PaginaActualizarClave() {
         {error ? <Alerta tipo="error">{error}</Alerta> : null}
         <Campo etiqueta="Nueva contraseña" requerido>
           <div className="relative">
-            <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
             <Entrada
               type={verClave ? "text" : "password"}
               value={nueva}
               onChange={(evento) => setNueva(evento.target.value)}
-              className="pl-9 pr-10"
+              className="pr-10"
               placeholder="Mínimo 8 caracteres, con letra y número"
               autoComplete="new-password"
               maxLength={200}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Package, Plus, Search, Trash2, Pencil, Phone, Mail, Building2 } from "lucide-react";
+import { Package, Plus, Trash2, Pencil, Phone, Mail, Building2 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { generarId } from "@/lib/utilidades/formato";
 import { toast } from "sonner";
@@ -96,13 +96,11 @@ export default function Proveedores() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-[var(--texto-suave)]" />
+        <div className="flex-1 max-w-sm">
           <Entrada
             placeholder="Buscar por nombre o RIF..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9"
           />
         </div>
         <Boton onClick={() => abrirModal()} variante="primario" className="inline-flex items-center gap-2">

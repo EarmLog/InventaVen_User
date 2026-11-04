@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, Send } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
@@ -67,13 +67,11 @@ export default function PaginaRecuperar() {
           {error ? <Alerta tipo="error">{error}</Alerta> : null}
           <Campo etiqueta="Correo electrónico" requerido>
             <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
               <Entrada
                 type="email"
                 value={correo}
                 onChange={(evento) => setCorreo(evento.target.value)}
                 placeholder="tu@negocio.com"
-                className="pl-9"
                 autoComplete="email"
                 required
               />

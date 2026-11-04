@@ -9,7 +9,6 @@ import {
   Eye,
   Pencil,
   RefreshCw,
-  Search,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -207,13 +206,12 @@ export default function PaginaPendientes() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
+            <div>
               <Entrada
                 value={busqueda}
                 onChange={(evento) => setBusqueda(evento.target.value)}
                 placeholder="Buscar factura, cliente, producto..."
-                className="pl-9 sm:w-64"
+                className="sm:w-64"
               />
             </div>
             <Selector

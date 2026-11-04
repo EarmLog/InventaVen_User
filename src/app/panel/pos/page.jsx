@@ -303,13 +303,11 @@ export default function PaginaPOS() {
         <div className="min-w-0 space-y-3">
           <Tarjeta className="p-3">
             <div className="grid gap-2 sm:grid-cols-[1.5fr_1fr_auto]">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
+              <div>
                 <Entrada
                   value={busqueda}
                   onChange={(evento) => setBusqueda(evento.target.value)}
                   placeholder="Buscar producto, SKU o variante..."
-                  className="pl-9"
                   autoFocus
                 />
               </div>
@@ -354,6 +352,7 @@ export default function PaginaPOS() {
             onCerrar={() => setQrAbierto(false)}
             onScan={procesarCodigoEscaneado}
             cerrarAlEscanear={false}
+            modo="pos"
           />
 
           {activos.length === 0 ? (

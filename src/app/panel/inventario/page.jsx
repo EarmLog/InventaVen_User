@@ -203,13 +203,11 @@ export default function PaginaInventario() {
 
       <Tarjeta className="p-3 sm:p-4">
         <div className="grid gap-2 sm:grid-cols-[1.4fr_0.8fr_0.8fr]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--texto-tenue)]" />
+          <div>
             <Entrada
               value={busqueda}
               onChange={(evento) => setBusqueda(evento.target.value)}
               placeholder="Buscar por nombre, SKU, categoría o variante..."
-              className="pl-9"
             />
           </div>
           <Selector value={categoria} onChange={(evento) => setCategoria(evento.target.value)}>
@@ -266,6 +264,7 @@ export default function PaginaInventario() {
             setBusqueda(codigo);
             toast.success(`Código recibido desde móvil: ${codigo}`);
           }}
+          modo="inventario"
         />
       </Tarjeta>
 

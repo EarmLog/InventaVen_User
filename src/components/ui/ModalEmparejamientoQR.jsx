@@ -11,11 +11,13 @@ export default function ModalEmparejamientoQR({
   onCerrar,
   onScan,
   cerrarAlEscanear = true,
+  modo = "inventario",
 }) {
   const [canalId, setCanalId] = useState("");
   const [conectado, setConectado] = useState(false);
   const [ultimoCodigo, setUltimoCodigo] = useState("");
   const [totalEscaneos, setTotalEscaneos] = useState(0);
+  const modoEscaner = modo === "pos" ? "pos" : "inventario";
   const onScanRef = useRef(onScan);
   const onCerrarRef = useRef(onCerrar);
   const cerrarRef = useRef(cerrarAlEscanear);
@@ -60,7 +62,7 @@ export default function ModalEmparejamientoQR({
 
   const urlEscaneo =
     typeof window !== "undefined" && canalId
-      ? `${window.location.origin}/escaner?canal=${canalId}`
+      ? `${window.location.origin}/escaner?canal=${canalId}&modo=${modoEscaner}`
       : "";
   const urlQr = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(urlEscaneo)}`;
 
@@ -68,8 +70,8 @@ export default function ModalEmparejamientoQR({
     <Modal
       abierto={abierto}
       onCerrar={onCerrar}
-      titulo="Conectar escáner móvil (QR)"
-      descripcion="Escanea este código QR con la cámara de tu teléfono para usarlo como pistola de códigos de barras."
+      titulo={modoEscaner === "pos" ? "Conectar escáner móvil (QR) · Modo Punto de venta" : "Conectar escáner móvil (QR) · Modo Registro de inventario"}
+      descripcion={modoEscaner === "pos" ? "Escanea este código QR con la cámara de tu teléfono para usarlo como pistola de códigos de barras en tu punto de venta." : "Escanea este código QR con la cámara de tu teléfono para usarlo como pistola de códigos de barras para el registro de inventario."}
       ancho="sm"
     >
       <div className="flex flex-col items-center justify-center space-y-4 text-center">
@@ -94,9 +96,14 @@ export default function ModalEmparejamientoQR({
           )}
         </div>
 
+        <div className="flex items-center gap-2 rounded-full bg-[var(--superficie)] px-3 py-1 text-xs font-semibold text-[var(--texto-suave)]">
+          {modoEscaner === "pos" ? "MODO: PUNTO DE VENTA" : "MODO: REGISTRO DE INVENTARIO"}
+        </div>
+
         <p className="text-xs text-[var(--texto-suave)]">
-          Apunta con la cámara de tu teléfono al código anterior o abre el enlace en tu
-          celular. Al enfocar cualquier producto, se enviará al instante a esta pantalla.
+          {modoEscaner === "pos"
+            ? "Apunta con la cámara de tu teléfono al código anterior o abre el enlace en tu celular. En modo punto de venta los escaneos se acumulan directamente en el carrito."
+            : "Apunta con la cámara de tu teléfono al código anterior o abre el enlace en tu celular. Al enfocar cualquier producto, se enviará al instante a esta pantalla."}
         </p>
 
         {ultimoCodigo ? (

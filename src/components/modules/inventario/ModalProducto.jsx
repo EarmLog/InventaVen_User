@@ -697,6 +697,7 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
         onCerrar={() => setQrAbierto(false)}
         onScan={aplicarCodigoEscaneado}
         cerrarAlEscanear={false}
+        modo="inventario"
       />
     </>
   );

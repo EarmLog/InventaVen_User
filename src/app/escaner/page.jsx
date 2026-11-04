@@ -10,6 +10,7 @@ import { reproducirPitidoExito } from "@/lib/utilidades/audio";
 function ContenidoEscanerMovil() {
   const searchParams = useSearchParams();
   const canalId = searchParams.get("canal");
+  const modo = searchParams.get("modo") === "pos" ? "pos" : "inventario";
   const [estado, setEstado] = useState("conectando");
   const [ultimoCodigo, setUltimoCodigo] = useState("");
   const ultimoEnvio = useRef({ codigo: "", momento: 0 });
@@ -97,6 +98,10 @@ function ContenidoEscanerMovil() {
           <Wifi className={`h-3.5 w-3.5 ${estado === "listo" ? "text-emerald-400 animate-pulse" : "text-amber-400"}`} />
           {estado === "listo" ? "Conectado a PC" : estado === "enviando" || estado === "enviado" ? "¡Enviado!" : "Conectando..."}
         </div>
+        <div className="flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold">
+          <QrCode className="h-3.5 w-3.5 text-emerald-400" />
+          {modo === "pos" ? "MODO: PUNTO DE VENTA" : "MODO: REGISTRO DE INVENTARIO"}
+        </div>
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center space-y-4">
@@ -113,7 +118,9 @@ function ContenidoEscanerMovil() {
         </div>
 
         <p className="text-center text-xs text-slate-400">
-          Apunta al código de barras del producto. Se enviará automáticamente a tu caja registradora en la computadora.
+          {modo === "pos"
+            ? "Apunta al código de barras. Los escaneos se envían a tu punto de venta y se agregan al carrito automáticamente."
+            : "Apunta al código de barras del producto. Se enviará automáticamente a tu caja registradora en la computadora."}
         </p>
       </main>
     </div>
