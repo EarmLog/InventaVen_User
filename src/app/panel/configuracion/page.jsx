@@ -28,7 +28,7 @@ import Interruptor from "@/components/ui/Interruptor";
 import Modal from "@/components/ui/Modal";
 import Alerta from "@/components/ui/Alerta";
 import { descargarRespaldo, restaurarRespaldo } from "@/lib/db/respaldo";
-import { guardarAjuste } from "@/lib/db/repositorios";
+import { actualizarPreciosPorTasa, guardarAjuste } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 import { formatearFechaHora, formatearNumero, formatearVes } from "@/lib/utilidades/formato";
 
@@ -41,6 +41,7 @@ export default function PaginaConfiguracion() {
   const [nombreNegocio, setNombreNegocio] = useState("");
   const [telefono, setTelefono] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+  const [recalculandoPrecios, setRecalculandoPrecios] = useState(false);
 
   const [nuevaClave, setNuevaClave] = useState("");
   const [confirmarClave, setConfirmarClave] = useState("");
@@ -106,6 +107,20 @@ export default function PaginaConfiguracion() {
       );
     } catch (error) {
       toast.error(error.message);
+    }
+  }
+
+  async function recalcularPreciosAhora() {
+    setRecalculandoPrecios(true);
+    try {
+      const actualizados = await actualizarPreciosPorTasa(tasa);
+      toast.success(
+        `Precios recalculados en bolívares con la tasa de ${formatearVes(tasa)} (${actualizados} productos).`
+      );
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setRecalculandoPrecios(false);
     }
   }
 
@@ -282,13 +297,28 @@ export default function PaginaConfiguracion() {
             ) : null}
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <Interruptor
               activo={autoPrecios}
               onCambio={alternarAutoPrecios}
+              disabled={recalculandoPrecios}
               etiqueta="Actualizar precios en Bs. automáticamente"
-              descripcion="Al cambiar la tasa, los precios de venta en bolívares se recalculan desde su equivalente en dólares."
+              descripcion="Al activarlo, los precios de venta en bolívares se recalculan desde su equivalente en dólares cada vez que cambia la tasa. Al desactivarlo, los precios se quedan congelados en el último valor."
             />
+            <div className="flex flex-wrap items-center gap-2">
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                onClick={recalcularPreciosAhora}
+                cargando={recalculandoPrecios}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Recalcular precios ahora
+              </Boton>
+              <p className="text-[10px] text-[var(--texto-suave)]">
+                Se recalculan los precios en bolívares a partir de los equivalentes en dólares con la tasa vigente.
+              </p>
+            </div>
           </div>
           <p className="mt-3 rounded-lg bg-[var(--superficie-2)] px-3 py-2 text-[10px] text-[var(--texto-suave)]">
             Última actualización de precios:{" "}
@@ -389,8 +419,9 @@ export default function PaginaConfiguracion() {
             <Interruptor
               activo={sincronizacionNube}
               onCambio={alternarSincronizacionNube}
+              disabled
               etiqueta="Sincronización con la nube"
-              descripcion="Permite activar el respaldo opcional en la nube para este dispositivo."
+              descripcion="Próximamente. El respaldo opcional en la nube aún no está disponible."
             />
           </div>
           <Alerta tipo="advertencia" className="mt-3">

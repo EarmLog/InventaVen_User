@@ -712,6 +712,10 @@ export async function actualizarPreciosPorTasa(nuevaTasa) {
       clave: CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS,
       valor: ahora,
     });
+    await db.ajustes.put({
+      clave: CLAVES_AJUSTES.TASA_ULTIMA_APLICADA,
+      valor: tasa,
+    });
   });
   return actualizados;
 }

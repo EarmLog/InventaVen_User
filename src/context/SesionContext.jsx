@@ -120,6 +120,7 @@ export function ProveedorSesion({ children }) {
             nombre: nombreNegocio,
             telefono: telefono || "",
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel`,
         },
       });
       if (error) throw new Error(traducirErrorAuth(error));
@@ -127,6 +128,26 @@ export function ProveedorSesion({ children }) {
     },
     []
   );
+
+  const reenviarConfirmacion = useCallback(async (correo) => {
+    const supabase = obtenerClienteSupabase();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: String(correo || "").trim().toLowerCase(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel` },
+    });
+    if (error) throw new Error(traducirErrorAuth(error));
+    return true;
+  }, []);
+
+  const cambiarCorreo = useCallback(async (nuevoCorreo) => {
+    const supabase = obtenerClienteSupabase();
+    const { error } = await supabase.auth.updateUser({
+      email: String(nuevoCorreo || "").trim().toLowerCase(),
+    });
+    if (error) throw new Error(traducirErrorAuth(error));
+    return true;
+  }, []);
 
   const cerrarSesion = useCallback(async () => {
     const supabase = obtenerClienteSupabase();
@@ -183,6 +204,8 @@ export function ProveedorSesion({ children }) {
         cargandoPerfil,
         iniciarSesion,
         registrarUsuario,
+        reenviarConfirmacion,
+        cambiarCorreo,
         cerrarSesion,
         recuperarClave,
         cambiarClave,
