@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boxes, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -8,9 +8,11 @@ import { ProveedorTasa, useTasa } from "@/context/TasaContext";
 import { useSesion } from "@/context/SesionContext";
 import BarraLateral from "@/components/layout/BarraLateral";
 import BarraSuperior from "@/components/layout/BarraSuperior";
+import ModalBienvenida from "@/components/modules/onboarding/ModalBienvenida";
 import { asegurarDatosIniciales, configurarBaseDatosUsuario } from "@/lib/db/baseDatos";
 import {
   actualizarPreciosPorTasa,
+  guardarAjuste,
   obtenerAjustes,
 } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
@@ -36,7 +38,8 @@ function ContenidoPanel({ children }) {
   const { tasa } = useTasa();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [autoPrecios, setAutoPrecios] = useState(false);
-  const ultimaTasaAplicada = useRef(0);
+  const [ultimaTasaAplicada, setUltimaTasaAplicada] = useState(null);
+  const [onboardingAbierto, setOnboardingAbierto] = useState(false);
 
   useEffect(() => {
     if (sesion === null) router.replace("/login");
@@ -60,7 +63,14 @@ function ContenidoPanel({ children }) {
     let activo = true;
     async function leerAjustes() {
       const ajustes = await obtenerAjustes();
-      if (activo) setAutoPrecios(Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_PRECIOS_AUTO]));
+      if (activo) {
+        setAutoPrecios(Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_PRECIOS_AUTO]));
+        setUltimaTasaAplicada(
+          ajustes[CLAVES_AJUSTES.TASA_ULTIMA_APLICADA] != null
+            ? Number(ajustes[CLAVES_AJUSTES.TASA_ULTIMA_APLICADA])
+            : null
+        );
+      }
     }
     leerAjustes();
     const alCambiar = () => leerAjustes();
@@ -72,13 +82,39 @@ function ContenidoPanel({ children }) {
   }, []);
 
   useEffect(() => {
+    let activo = true;
+    async function revisarOnboarding() {
+      try {
+        const ajustes = await obtenerAjustes();
+        if (!activo) return;
+        setOnboardingAbierto(!ajustes[CLAVES_AJUSTES.ONBOARDING_VISTO]);
+      } catch {
+        if (activo) setOnboardingAbierto(false);
+      }
+    }
+    if (sesion) revisarOnboarding();
+    return () => {
+      activo = false;
+    };
+  }, [sesion]);
+
+  async function cerrarOnboarding() {
+    setOnboardingAbierto(false);
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.ONBOARDING_VISTO, true);
+    } catch {
+      // Se mantiene cerrado en pantalla para reintentar.
+    }
+  }
+
+  useEffect(() => {
     if (!autoPrecios || !tasa || !sesion) return;
-    if (Math.abs(ultimaTasaAplicada.current - tasa) < 0.0001) return;
+    if (ultimaTasaAplicada !== null && Math.abs(ultimaTasaAplicada - tasa) < 0.0001) return;
     let cancelado = false;
     (async () => {
       try {
         const actualizados = await actualizarPreciosPorTasa(tasa);
-        ultimaTasaAplicada.current = tasa;
+        setUltimaTasaAplicada(tasa);
         if (!cancelado && actualizados > 0) {
           toast.info(
             `Precios actualizados en Bs. con la tasa de ${formatearVes(tasa)} (${actualizados} productos).`
@@ -122,6 +158,7 @@ function ContenidoPanel({ children }) {
           dispositivo
         </footer>
       </div>
+      <ModalBienvenida abierto={onboardingAbierto} onCerrar={cerrarOnboarding} />
     </div>
   );
 }
