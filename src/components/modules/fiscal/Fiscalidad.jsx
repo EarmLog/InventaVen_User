@@ -2,10 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { FileText, Download, Filter, Calendar } from "lucide-react";
+import { FileText, Download, Filter, Calendar, Send } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { resumirFacturacion } from "@/lib/utilidades/fiscalidad";
 import { exportarExcelReporte, exportarPdfReporte } from "@/lib/utilidades/exportar";
+import {
+  emitirComprobanteFiscal,
+  generarReporteCierreCaja,
+  generarReporteParcialCierreCaja,
+} from "@/lib/fiscal/servicioFacturacion";
 import { toast } from "sonner";
 import Tarjeta from "@/components/ui/Tarjeta";
 import Boton from "@/components/ui/Boton";
@@ -23,6 +28,8 @@ export default function Fiscalidad() {
 
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
+  const [emitiendo, setEmitiendo] = useState(false);
+  const [nivelFiscal, setNivelFiscal] = useState("B");
 
   const ventasFiltradas = useMemo(() => {
     return ventas.filter((v) => {
@@ -45,6 +52,50 @@ export default function Fiscalidad() {
   }, [facturas, fechaInicio, fechaFin]);
 
   const resumen = useMemo(() => resumirFacturacion(ventasFiltradas), [ventasFiltradas]);
+
+  async function emitirComprobante(venta, nivel = "B") {
+    if (!venta) {
+      toast.error("Selecciona una venta para emitir el comprobante fiscal.");
+      return;
+    }
+    setEmitiendo(true);
+    try {
+      const resultado = await emitirComprobanteFiscal({
+        venta,
+        tipo: venta.tipo || "venta",
+        nivel,
+        datosMaquina: { registro: "MAQ-0001" },
+      });
+      toast.success(`Comprobante fiscal emitido (${nivel}). Control: ${resultado.numeroControl}`);
+    } catch (error) {
+      toast.error(error.message || "No se pudo emitir el comprobante fiscal.");
+    } finally {
+      setEmitiendo(false);
+    }
+  }
+
+  async function generarCierreCaja() {
+    try {
+      const reporte = await generarReporteCierreCaja();
+      toast.success(
+        `Reporte Z generado. Comprobantes: ${reporte.totalComprobantes}. Total USD: ${reporte.totalUsd}.`
+      );
+    } catch (error) {
+      toast.error(error.message || "No se pudo generar el reporte Z.");
+    }
+  }
+
+  async function generarParcialCierreCaja() {
+    try {
+      const reporte = await generarReporteParcialCierreCaja();
+      toast.success(
+        `Reporte X generado. Comprobantes: ${reporte.totalComprobantes}. Total USD: ${reporte.totalUsd}.`
+      );
+    } catch (error) {
+      toast.error(error.message || "No se pudo generar el reporte X.");
+    }
+  }
+
 
   const exportarExcelSeniat = () => {
     try {
@@ -160,7 +211,33 @@ export default function Fiscalidad() {
               </Boton>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Boton
+              variante="secundario"
+              onClick={() => emitirComprobante(ventasFiltradas[0], "A")}
+              cargando={emitiendo}
+              disabled={!ventasFiltradas[0]}
+            >
+              <Send className="h-4 w-4" />
+              Emitir comprobante (A)
+            </Boton>
+            <Boton
+              variante="primario"
+              onClick={() => emitirComprobante(ventasFiltradas[0], "B")}
+              cargando={emitiendo}
+              disabled={!ventasFiltradas[0]}
+            >
+              <Send className="h-4 w-4" />
+              Emitir comprobante (B)
+            </Boton>
+            <Boton variante="secundario" onClick={generarCierreCaja} disabled={!ventasFiltradas.length}>
+              <Download className="h-4 w-4" />
+              Reporte Z (cierre)
+            </Boton>
+            <Boton variante="secundario" onClick={generarParcialCierreCaja} disabled={!ventasFiltradas.length}>
+              <Download className="h-4 w-4" />
+              Reporte X (parcial)
+            </Boton>
             <Boton variante="secundario" onClick={exportarExcelSeniat} className="inline-flex items-center gap-2">
               <Download className="h-4 w-4" />
               Exportar Excel (Tributario)
