@@ -21,6 +21,7 @@ import {
   calcularGanancia,
   precioUnitarioVariante,
 } from "@/lib/utilidades/precios";
+import { construirComprobanteFiscal } from "@/lib/utilidades/fiscalidad";
 
 function validarBaseDatos() {
   if (!db) throw new Error("La base de datos no está disponible.");
@@ -305,7 +306,7 @@ export async function registrarVenta({
     ? tipoPago
     : "efectivo";
 
-  return db.transaction(
+  const venta = await db.transaction(
     "rw",
     db.productos,
     db.ventas,
@@ -488,6 +489,16 @@ export async function registrarVenta({
       return venta;
     }
   );
+
+  const comprobante = construirComprobanteFiscal(venta, "venta");
+  await guardarFacturaFiscal({
+    ...comprobante,
+    nivel: "B",
+    estado: "enviada",
+    registroMaquina: "MAQ-0001",
+  });
+
+  return venta;
 }
 
 function validarTipoError(tipo) {
