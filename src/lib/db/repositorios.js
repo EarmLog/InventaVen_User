@@ -753,6 +753,18 @@ export async function listarFacturasFiscales() {
   return db.facturasFiscales.orderBy("fecha").reverse().toArray();
 }
 
+export async function guardarCompraFiscal(compra) {
+  validarBaseDatos();
+  if (!compra) throw new Error("La compra fiscal no es válida.");
+  const registro = { ...compra, id: compra.id || generarId() };
+  return db.compras.put(registro);
+}
+
+export async function listarComprasFiscales() {
+  validarBaseDatos();
+  return db.compras.orderBy("fecha").reverse().toArray();
+}
+
 export async function registrarAuditoria({
   usuarioId = "local",
   accion,

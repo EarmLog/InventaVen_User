@@ -1,6 +1,15 @@
 import { db } from "@/lib/db/baseDatos";
-import { guardarFacturaFiscal, listarFacturasFiscales } from "@/lib/db/repositorios";
-import { construirComprobanteFiscal, resumirFacturacion } from "@/lib/utilidades/fiscalidad";
+import {
+  guardarFacturaFiscal,
+  listarFacturasFiscales,
+  guardarCompraFiscal,
+  listarComprasFiscales,
+} from "@/lib/db/repositorios";
+import {
+  construirComprobanteFiscal,
+  resumirFacturacion,
+  resumirCompras,
+} from "@/lib/utilidades/fiscalidad";
 import { generarId } from "@/lib/utilidades/formato";
 
 export const NIVELES_FISCAL = ["A", "B"];
@@ -32,6 +41,36 @@ export async function emitirComprobanteFiscal({
 
 export async function listarComprobantesFiscales() {
   return listarFacturasFiscales();
+}
+
+export async function registrarCompraFiscal({ compra }) {
+  const factura = await guardarCompraFiscal(compra);
+  return { ...compra, id: factura };
+}
+
+export async function listarComprobantesCompras() {
+  const compras = await listarComprasFiscales();
+  return compras;
+}
+
+export async function generarLibroVentas({ fecha } = {}) {
+  const ventas = await db.ventas.where("estado").equals("completada").toArray();
+  const delDia = fecha ? String(fecha).slice(0, 10) : null;
+  const delDiaVentas = delDia
+    ? ventas.filter((venta) => String(venta.fecha || "").slice(0, 10) === delDia)
+    : ventas;
+  const resumen = resumirFacturacion(delDiaVentas);
+  return { fecha: fecha || null, tipo: "ventas", ...resumen };
+}
+
+export async function generarLibroCompras({ fecha } = {}) {
+  const compras = await db.compras.orderBy("fecha").reverse().toArray();
+  const delDia = fecha ? String(fecha).slice(0, 10) : null;
+  const delDiaCompras = delDia
+    ? compras.filter((compra) => String(compra.fecha || "").slice(0, 10) === delDia)
+    : compras;
+  const resumen = resumirCompras(delDiaCompras);
+  return { fecha: fecha || null, tipo: "compras", ...resumen };
 }
 
 export async function generarReporteCierreCaja({ fecha } = {}) {

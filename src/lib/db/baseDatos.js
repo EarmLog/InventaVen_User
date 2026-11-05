@@ -33,6 +33,22 @@ class BaseDatosInventaVen extends Dexie {
         "id, tipo, entidadId, entidadTipo, fecha, detalle, estado",
       proveedores: "id, nombre, rif, telefono, email, creadoEn",
     });
+    this.version(4).stores({
+      productos:
+        "id, sku, nombre, categoria, activo, creadoEn, actualizadoEn, fechaRenovacion",
+      ventas: "id, codigo, numeroFactura, fecha, estado, tipoPago, creadoEn",
+      ajustes: "clave",
+      secuencias: "nombre",
+      movimientos: "id, productoId, varianteId, tipo, fecha",
+      facturasFiscales:
+        "id, ventaId, tipo, estado, fecha, totalUsd, createdAt, updatedAt",
+      auditorias:
+        "id, usuarioId, accion, entidad, entidadId, fecha, detalle",
+      operacionesEspeciales:
+        "id, tipo, entidadId, entidadTipo, fecha, detalle, estado",
+      proveedores: "id, nombre, rif, telefono, email, creadoEn",
+      compras: "id, fecha, tipo, estado, totalUsd, createdAt, updatedAt",
+    });
   }
 }
 

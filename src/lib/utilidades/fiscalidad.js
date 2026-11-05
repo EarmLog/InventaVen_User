@@ -1,5 +1,5 @@
-import { PORCENTAJE_IVA, PORCENTAJE_IGTF } from "./constantes";
-import { redondear } from "./formato";
+import { PORCENTAJE_IVA, PORCENTAJE_IGTF } from "./constantes.js";
+import { redondear } from "./formato.js";
 
 export const TIPOS_COMPROBANTE_FISCAL = [
   { valor: "venta", etiqueta: "Venta" },
@@ -122,5 +122,40 @@ export function resumirFacturacion(ventas = []) {
     totalRetenidoVes: retencionesVes,
     tipoIva: PORCENTAJE_IVA,
     tipoIgtf: PORCENTAJE_IGTF,
+  };
+}
+
+export function resumirCompras(compras = []) {
+  const registradas = compras.filter((compra) => compra && compra.estado !== "cancelada");
+  const baseUsd = redondear(registradas.reduce((t, c) => t + Number(c.baseImponibleUsd) || 0, 0));
+  const baseVes = redondear(registradas.reduce((t, c) => t + Number(c.baseImponibleVes) || 0, 0));
+  const ivaUsd = redondear(registradas.reduce((t, c) => t + Number(c.ivaUsd) || 0, 0));
+  const ivaVes = redondear(registradas.reduce((t, c) => t + Number(c.ivaVes) || 0, 0));
+  const igtfUsd = redondear(registradas.reduce((t, c) => t + Number(c.igtfUsd) || 0, 0));
+  const igtfVes = redondear(registradas.reduce((t, c) => t + Number(c.igtfVes) || 0, 0));
+  const totalUsd = redondear(registradas.reduce((t, c) => t + Number(c.totalUsd) || 0, 0));
+  const totalVes = redondear(registradas.reduce((t, c) => t + Number(c.totalVes) || 0, 0));
+  const retencionesUsd = redondear(
+    registradas.reduce((t, c) => t + Number(c.retencionesUsd) || 0, 0)
+  );
+  const retencionesVes = redondear(
+    registradas.reduce((t, c) => t + Number(c.retencionesVes) || 0, 0)
+  );
+
+  return {
+    totalComprobantes: registradas.length,
+    baseImponibleUsd: baseUsd,
+    baseImponibleVes: baseVes,
+    ivaUsd,
+    ivaVes,
+    igtfUsd,
+    igtfVes,
+    totalUsd,
+    totalVes,
+    retencionesUsd,
+    retencionesVes,
+    totalRetenidoUsd: retencionesUsd,
+    totalRetenidoVes: retencionesVes,
+    tipo: "compras",
   };
 }
