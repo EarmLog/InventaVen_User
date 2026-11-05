@@ -101,6 +101,7 @@ export async function PATCH(request) {
     const nombreNegocio = limpiarTexto(cuerpo.nombreNegocio, 160);
     const telefono = limpiarTexto(cuerpo.telefono, 40);
     const rif = limpiarTexto(cuerpo.rif, 20);
+    const onboardingVisto = Boolean(cuerpo.onboardingVisto);
     if (!nombreNegocio) {
       return NextResponse.json(
         { error: "El nombre del negocio es obligatorio." },
@@ -126,6 +127,7 @@ export async function PATCH(request) {
       telefono,
     };
     if (rif) metadatosActualizados.rif = rif;
+    metadatosActualizados.onboardingVisto = onboardingVisto;
 
     await cliente.auth.admin.updateUserById(usuario.id, {
       user_metadata: metadatosActualizados,

@@ -119,6 +119,7 @@ export function ProveedorSesion({ children }) {
             nombre_negocio: nombreNegocio,
             nombre: nombreNegocio,
             telefono: telefono || "",
+            onboardingVisto: false,
           },
           emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel`,
         },
@@ -189,6 +190,14 @@ export function ProveedorSesion({ children }) {
     []
   );
 
+  const marcarOnboardingCompletado = useCallback(async () => {
+    const supabase = obtenerClienteSupabase();
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      await solicitarPerfil(data.session.access_token, "PATCH", { onboardingVisto: true });
+    }
+  }, []);
+
   const refrescarPerfil = useCallback(async () => {
     const supabase = obtenerClienteSupabase();
     const { data } = await supabase.auth.getSession();
@@ -210,6 +219,7 @@ export function ProveedorSesion({ children }) {
         recuperarClave,
         cambiarClave,
         actualizarPerfil,
+        marcarOnboardingCompletado,
         refrescarPerfil,
       }}
     >

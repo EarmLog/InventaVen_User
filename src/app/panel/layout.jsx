@@ -34,7 +34,7 @@ function PantallaCargando({ texto = "Preparando tu panel..." }) {
 
 function ContenidoPanel({ children }) {
   const router = useRouter();
-  const { sesion, perfil, cargandoPerfil, refrescarPerfil } = useSesion();
+  const { sesion, perfil, cargandoPerfil, refrescarPerfil, marcarOnboardingCompletado } = useSesion();
   const { tasa } = useTasa();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [autoPrecios, setAutoPrecios] = useState(false);
@@ -104,6 +104,11 @@ function ContenidoPanel({ children }) {
       await guardarAjuste(CLAVES_AJUSTES.ONBOARDING_VISTO, true);
     } catch {
       // Se mantiene cerrado en pantalla para reintentar.
+    }
+    try {
+      await marcarOnboardingCompletado();
+    } catch {
+      // El indicador local ya quedó marcado.
     }
   }
 

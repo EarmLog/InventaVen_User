@@ -6,24 +6,22 @@ import Modal from "@/components/ui/Modal";
 
 const PASOS = [
   {
+    tipo: "bienvenida",
     titulo: "Bienvenido a InventaVen",
     texto:
       "En este dispositivo vas a registrar tus productos, registrar ventas y revisar tu inventario y ganancias.",
   },
   {
-    titulo: "Escaneo móvil",
+    tipo: "config",
+    titulo: "Configuración inicial",
     texto:
-      "Usa el escáner desde el móvil para registrar punto de venta o altas de inventario sin escribir códigos a mano.",
+      "Registra el RIF, el nombre completo del negocio (con .C.A o similar), la dirección, la zona postal y el tipo de negocio.",
   },
   {
-    titulo: "Copias de seguridad",
+    tipo: "preferencias",
+    titulo: "Preferencias y capacitación",
     texto:
-      "Genera respaldos periódicos desde la configuración para proteger tus datos ante pérdida o falla del dispositivo.",
-  },
-  {
-    titulo: "Precios en bolívares",
-    texto:
-      "La tasa del dólar se actualiza automáticamente. La actualización de precios en bolívares queda desactivada por defecto.",
+      "Activa el modo oscuro y la actualización automática de precios, y revisa las secciones de capacitación.",
   },
 ];
 
@@ -45,30 +43,19 @@ export default function ModalBienvenida({ abierto, onCerrar }) {
       titulo={pasoActual.titulo}
       descripcion={`Paso ${Math.min(paso + 1, PASOS.length)} de ${PASOS.length}`}
       ancho="md"
-      pie={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            {PASOS.map((item, indice) => (
-              <span
-                key={item.titulo}
-                className={[
-                  "h-2 w-6 rounded-full transition-colors",
-                  indice === paso
-                    ? "bg-[var(--primario)]"
-                    : "bg-[var(--borde-fuerte)]",
-                ].join(" ")}
-              />
-            ))}
-          </div>
-          {paso < PASOS.length - 1 ? (
-            <Boton onClick={() => setPaso((valor) => valor + 1)}>Siguiente</Boton>
-          ) : (
-            <Boton onClick={onCerrar}>Entendido</Boton>
-          )}
-        </div>
-      }
     >
-      <p className="text-sm leading-relaxed text-[var(--texto-suave)]">{pasoActual.texto}</p>
+      <div className="flex flex-col items-center gap-5 py-6 text-center">
+        <p className="text-lg font-bold tracking-tight text-[var(--texto)]">{pasoActual.texto}</p>
+        {paso === 0 ? (
+          <Boton className="animate-pulse" onClick={() => setPaso(1)}>
+            Siguiente
+          </Boton>
+        ) : paso < PASOS.length - 1 ? (
+          <Boton onClick={() => setPaso((valor) => valor + 1)}>Siguiente</Boton>
+        ) : (
+          <Boton onClick={onCerrar}>Entendido</Boton>
+        )}
+      </div>
     </Modal>
   );
 }
