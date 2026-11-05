@@ -1,4 +1,4 @@
-import { formatearUsd, formatearVes } from "./formato";
+import { formatearVes } from "./formato";
 
 export async function imprimirTicketTermico(venta, negocio = {}) {
   const anchoTicket = "58mm";
@@ -69,8 +69,8 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
             <td colspan="2"><strong>${item.cantidad}x ${item.nombre}</strong> ${item.variante ? `(${item.variante})` : ""}</td>
           </tr>
           <tr>
-            <td>${formatearUsd(item.precioUnitarioUsd)} c/u</td>
-            <td class="text-right">${formatearUsd(item.totalLineaUsd)}</td>
+            <td>${formatearVes(item.precioUnitarioVes)} c/u</td>
+            <td class="text-right">${formatearVes(item.totalLineaVes)}</td>
           </tr>
         `
           )
@@ -81,24 +81,20 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
 
   <div class="border-t">
     <div class="flex">
-      <span>Subtotal USD:</span>
-      <span>${formatearUsd(venta.subtotalUsd)}</span>
+      <span>Subtotal:</span>
+      <span>${formatearVes(venta.subtotalVes)}</span>
     </div>
-    ${venta.ivaUsd > 0 ? `
+    ${venta.ivaVes > 0 ? `
     <div class="flex">
       <span>IVA (${venta.porcentajeIva || 16}%):</span>
-      <span>${formatearUsd(venta.ivaUsd)}</span>
+      <span>${formatearVes(venta.ivaVes)}</span>
     </div>
     ` : ""}
     <div class="flex font-bold" style="font-size: 12px; margin-top: 4px;">
-      <span>TOTAL USD:</span>
-      <span>${formatearUsd(venta.totalUsd)}</span>
-    </div>
-    <div class="flex" style="margin-top: 2px; font-size: 12px;">
-      <span>TOTAL VES:</span>
+      <span>TOTAL:</span>
       <span>${formatearVes(venta.totalVes)}</span>
     </div>
-    <div style="font-size: 9px; margin-top: 2px;">Tasa BCV: ${formatearVes(venta.tasaUsd)} / $</div>
+    <div style="font-size: 9px; margin-top: 2px;">Tasa BCV: ${formatearVes(venta.tasaUsd)}</div>
   </div>
 
   <div class="border-t text-center" style="margin-top: 10px; font-size: 10px;">
