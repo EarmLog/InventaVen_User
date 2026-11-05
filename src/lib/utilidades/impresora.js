@@ -40,64 +40,65 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
 </head>
 <body>
   <div class="text-center">
-    <div class="font-bold uppercase" style="font-size: 13px;">${negocio.nombreNegocio || "InventaVen POS"}</div>
-    ${negocio.rif ? `<div>RIF: ${negocio.rif}</div>` : ""}
-    ${negocio.telefono ? `<div>Tel: ${negocio.telefono}</div>` : ""}
-    <div style="font-size: 10px; margin-top: 2px;">${new Date(venta.fecha).toLocaleString()}</div>
+    <div>${negocio.rif || ""}</div>
+    <div class="font-bold" style="font-size: 13px;">${negocio.nombreNegocio || negocio.nombre || "InventaVen POS"}</div>
+    <div>${negocio.descripcion || ""} ${negocio.codigoZonaPostal || negocio.codigo_postal || ""}</div>
   </div>
 
-  <div class="border-t">
-    <div><strong>Factura:</strong> ${venta.numeroFactura || venta.codigo}</div>
-    <div><strong>Cajero:</strong> ${negocio.nombre || "Principal"}</div>
-    ${venta.clienteNombre ? `<div><strong>Cliente:</strong> ${venta.clienteNombre}</div>` : ""}
-    <div><strong>Pago:</strong> <span class="uppercase">${venta.tipoPago}</span></div>
-  </div>
-
-  <div class="border-t">
-    <table>
-      <thead>
-        <tr>
-          <th>Cant / Prod</th>
-          <th class="text-right">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${(venta.items || [])
-          .map(
-            (item) => `
-          <tr>
-            <td colspan="2"><strong>${item.cantidad}x ${item.nombre}</strong> ${item.variante ? `(${item.variante})` : ""}</td>
-          </tr>
-          <tr>
-            <td>${formatearVes(item.precioUnitarioVes)} c/u</td>
-            <td class="text-right">${formatearVes(item.totalLineaVes)}</td>
-          </tr>
-        `
-          )
-          .join("")}
-      </tbody>
-    </table>
-  </div>
-
-  <div class="border-t">
-    <div class="flex">
-      <span>Subtotal:</span>
-      <span>${formatearVes(venta.subtotalVes)}</span>
+  <div>
+    <div><strong>RAZON SOCIAL:</strong> ${venta.clienteNombre || "CLIENTE GENERICO"}</div>
+    <div><strong>CI/RIF:</strong> ${venta.clienteRif || "NO CI NO RIF"}</div>
+    <div><strong>CAJA4/CAJERA:</strong> ${negocio.caja || "POS"}</div>
+    <div><strong>NO.:</strong> ${venta.numeroFactura || venta.codigo}</div>
+    <div>
+      <span><strong>FECHA:</strong> ${new Date(venta.fecha).toLocaleDateString()}</span>
+      <span><strong>HORA:</strong> ${new Date(venta.fecha).toLocaleTimeString()}</span>
     </div>
-    ${venta.ivaVes > 0 ? `
-    <div class="flex">
-      <span>IVA (${venta.porcentajeIva || 16}%):</span>
-      <span>${formatearVes(venta.ivaVes)}</span>
+  </div>
+  <div>--------------</div>
+
+  <div>
+    ${(venta.items || []).map((item) => `
+      <div>
+        <span>${item.cantidad}x BSS ${formatearVes(item.totalLineaVes)}</span>
+        <span>${item.nombre}</span>
+      </div>
+    `).join("")}
+  </div>
+  <div>--------------</div>
+
+  <div>
+    <div class="flex" style="margin-top: 4px;">
+      <span>EXENTO (E):</span>
+      <span class="text-right">${formatearVes(venta.totalVes)}</span>
     </div>
-    ` : ""}
-    <div class="flex font-bold" style="font-size: 12px; margin-top: 4px;">
+    <div class="flex" style="margin-top: 2px;">
+      <span>BI G (${venta.porcentajeIva || 16},00%):</span>
+      <span class="text-right">${formatearVes(venta.baseVes)}</span>
+    </div>
+    <div class="flex" style="margin-top: 2px;">
+      <span>IVA G (${venta.porcentajeIva || 16},00):</span>
+      <span class="text-right">${formatearVes(venta.ivaVes)}</span>
+    </div>
+    <div class="flex font-bold" style="margin-top: 4px;">
       <span>TOTAL:</span>
-      <span>${formatearVes(venta.totalVes)}</span>
+      <span class="text-right">${formatearVes(venta.totalVes)}</span>
     </div>
-    <div style="font-size: 9px; margin-top: 2px;">Tasa BCV: ${formatearVes(venta.tasaUsd)}</div>
+    <div>
+      <span>PAGO (${venta.tipoPago}):</span>
+      <span class="text-right">${formatearVes(venta.totalVes)}</span>
+    </div>
+    <div>
+      <span>CAMBIO:</span>
+      <span class="text-right">${formatearVes(0)}</span>
+    </div>
+    <div>
+      <span>CATIDAD:</span>
+      <span class="text-right">${(venta.items || []).reduce((t, i) => t + Number(i.cantidad) || 0, 0)}</span>
+    </div>
   </div>
 
-  <div class="border-t text-center" style="margin-top: 10px; font-size: 10px;">
+  <div class="text-center" style="margin-top: 10px; font-size: 10px;">
     <div>¡Gracias por su compra!</div>
     <div>InventaVen · Sistema POS Offline</div>
   </div>

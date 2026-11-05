@@ -50,7 +50,7 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
             <Cpu className="h-4 w-4" />
             Emisor Fiscal (Driver)
           </Boton>
-          <Boton onClick={() => window.print()}>
+          <Boton onClick={() => imprimirTicketTermico(venta, perfil)}>
             <Printer className="h-4 w-4" />
             Imprimir factura
           </Boton>
