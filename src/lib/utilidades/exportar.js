@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { autoTable } from "jspdf-autotable";
 
 export function exportarExcelReporte(datos, nombreHoja = "Reporte", nombreArchivo = "reporte.xlsx") {
   const worksheet = XLSX.utils.json_to_sheet(datos);
@@ -20,7 +20,7 @@ export function exportarPdfReporte({ titulo = "Reporte InventaVen", columnas = [
   doc.setTextColor(100, 116, 139);
   doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 26);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: 32,
     head: [columnas],
     body: filas,
@@ -80,7 +80,7 @@ export function exportarAnalisisPdf({
   if (subtitulo) doc.text(subtitulo, 14, 26);
   doc.text(`Generado: ${new Date().toLocaleString()}`, 14, subtitulo ? 31 : 26);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: subtitulo ? 37 : 32,
     head: [["Indicador", "Valor"]],
     body: resumen,
@@ -91,7 +91,7 @@ export function exportarAnalisisPdf({
 
   if (columnas.length && filas.length) {
     const inicio = (doc.lastAutoTable?.finalY || 40) + 8;
-    doc.autoTable({
+    autoTable(doc, {
       startY: inicio,
       head: [columnas],
       body: filas,
