@@ -146,6 +146,9 @@ export default function Fiscalidad() {
             f.numeroFactura || "S/N",
             f.fecha ? f.fecha.slice(0, 10) : "",
             f.tipo || "venta",
+            `${Number(f.baseImponibleVes || 0).toFixed(2)} VES`,
+            `${Number(f.ivaVes || 0).toFixed(2)} VES`,
+            `${Number(f.totalVes || 0).toFixed(2)} VES`,
             `${Number(f.baseImponibleUsd || 0).toFixed(2)} USD`,
             `${Number(f.ivaUsd || 0).toFixed(2)} USD`,
             `${Number(f.totalUsd || 0).toFixed(2)} USD`,
@@ -154,6 +157,9 @@ export default function Fiscalidad() {
             v.codigo || v.id.slice(0, 8),
             v.fecha ? v.fecha.slice(0, 10) : "",
             "venta",
+            `${Number(v.baseVes || 0).toFixed(2)} VES`,
+            `${Number(v.ivaVes || 0).toFixed(2)} VES`,
+            `${Number(v.totalVes || 0).toFixed(2)} VES`,
             `${Number(v.baseUsd || 0).toFixed(2)} USD`,
             `${Number(v.ivaUsd || 0).toFixed(2)} USD`,
             `${Number(v.totalUsd || 0).toFixed(2)} USD`,
@@ -166,7 +172,17 @@ export default function Fiscalidad() {
 
       exportarPdfReporte({
         titulo: `Declaración Fiscal y Tributaria (${fechaInicio || "Inicio"} al ${fechaFin || "Hoy"})`,
-        columnas: ["Nro / Comprobante", "Fecha", "Tipo", "Base Imp.", "IVA (16%)", "Total"],
+        columnas: [
+          "Nro / Comprobante",
+          "Fecha",
+          "Tipo",
+          "Base Imponible (VES)",
+          "IVA (VES)",
+          "Total (VES)",
+          "Base Imponible (USD)",
+          "IVA (USD)",
+          "Total (USD)",
+        ],
         filas,
         nombreArchivo: `Declaracion_Fiscal_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.pdf`,
       });
@@ -262,10 +278,10 @@ export default function Fiscalidad() {
             Base imponible
           </p>
           <p className="mt-1 text-xl font-bold">
-            {resumen.baseImponibleUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
+            {resumen.baseImponibleVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
           </p>
           <p className="text-[10px] text-[var(--texto-tenue)]">
-            {resumen.baseImponibleVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
+            {resumen.baseImponibleUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
           </p>
         </Tarjeta>
         <Tarjeta className="p-4">
@@ -273,10 +289,10 @@ export default function Fiscalidad() {
             IVA (16%)
           </p>
           <p className="mt-1 text-xl font-bold">
-            {resumen.ivaUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
+            {resumen.ivaVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
           </p>
           <p className="text-[10px] text-[var(--texto-tenue)]">
-            {resumen.ivaVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
+            {resumen.ivaUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
           </p>
         </Tarjeta>
         <Tarjeta className="p-4">
@@ -284,10 +300,10 @@ export default function Fiscalidad() {
             Total imponible
           </p>
           <p className="mt-1 text-xl font-bold">
-            {resumen.totalUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
+            {resumen.totalVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
           </p>
           <p className="text-[10px] text-[var(--texto-tenue)]">
-            {resumen.totalVes.toLocaleString("es-VE", { maximumFractionDigits: 2 })} VES
+            {resumen.totalUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
           </p>
         </Tarjeta>
       </div>
