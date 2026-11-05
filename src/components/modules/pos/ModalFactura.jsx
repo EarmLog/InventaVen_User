@@ -27,12 +27,37 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
       titulo={`Factura ${venta.numeroFactura}`}
       descripcion="Venta registrada correctamente. Puedes imprimir ticket térmico o factura."
       ancho="lg"
+      pie={
+        <>
+          <Boton variante="secundario" onClick={onCerrar}>
+            Nueva venta
+          </Boton>
+          <Boton variante="secundario" onClick={() => imprimirTicketTermico(venta, perfil)}>
+            <ScrollText className="h-4 w-4" />
+            Ticket Térmico (58mm)
+          </Boton>
+          <Boton
+            variante="secundario"
+            onClick={() =>
+              emitirComprobanteFiscal({
+                venta,
+                perfil,
+                tipoImpresora: "the_factory",
+                datosMaquina: { registro: "MAQ-0001" },
+              })
+            }
+          >
+            <Cpu className="h-4 w-4" />
+            Emisor Fiscal (Driver)
+          </Boton>
+          <Boton onClick={() => window.print()}>
+            <Printer className="h-4 w-4" />
+            Imprimir factura
+          </Boton>
+        </>
+      }
     >
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div
-          className="zona-impresion rounded-xl border border-[var(--borde)] bg-white p-5 text-slate-900"
-          style={{ maxWidth: "58mm" }}
-        >
+      <div className="zona-impresion rounded-xl border border-[var(--borde)] bg-white p-5 text-slate-900">
         <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-lg font-bold tracking-tight">
@@ -155,34 +180,6 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
         <div className="mt-4 flex items-center justify-center gap-1.5 rounded-lg bg-slate-50 py-2 text-[10px] text-slate-500">
           <ReceiptText className="h-3.5 w-3.5" />
           Gracias por su compra · {venta.codigo}
-        </div>
-        </div>
-        <div className="flex w-full flex-col gap-2 lg:w-64">
-          <Boton onClick={() => window.print()}>
-            <Printer className="h-4 w-4" />
-            Imprimir factura
-          </Boton>
-          <Boton variante="secundario" onClick={onCerrar}>
-            Nueva venta
-          </Boton>
-          <Boton variante="secundario" onClick={() => imprimirTicketTermico(venta, perfil)}>
-            <ScrollText className="h-4 w-4" />
-            Ticket Térmico (58mm)
-          </Boton>
-          <Boton
-            variante="secundario"
-            onClick={() =>
-              emitirComprobanteFiscal({
-                venta,
-                perfil,
-                tipoImpresora: "the_factory",
-                datosMaquina: { registro: "MAQ-0001" },
-              })
-            }
-          >
-            <Cpu className="h-4 w-4" />
-            Emisor Fiscal (Driver)
-          </Boton>
         </div>
       </div>
     </Modal>
