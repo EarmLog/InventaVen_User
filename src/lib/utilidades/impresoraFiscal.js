@@ -1,4 +1,4 @@
-import { formatearUsd, formatearVes } from "./formato";
+import { formatearUsd, formatearVes } from "./formato.js";
 
 export const TIPOS_IMPRESORA_FISCAL = [
   { valor: "the_factory", etiqueta: "The Factory (HKA)" },
