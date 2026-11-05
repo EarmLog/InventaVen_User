@@ -1,10 +1,11 @@
 "use client";
 
-import { Printer, ReceiptText, ScrollText } from "lucide-react";
+import { Printer, ReceiptText, ScrollText, Cpu } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
 import { TIPOS_PAGO } from "@/lib/utilidades/constantes";
 import { imprimirTicketTermico } from "@/lib/utilidades/impresora";
+import { emitirComprobanteFiscal } from "@/lib/fiscal/servicioFacturacion";
 import {
   formatearFechaHora,
   formatearNumero,
@@ -34,6 +35,20 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
           <Boton variante="secundario" onClick={() => imprimirTicketTermico(venta, perfil)}>
             <ScrollText className="h-4 w-4" />
             Ticket Térmico (58mm)
+          </Boton>
+          <Boton
+            variante="secundario"
+            onClick={() =>
+              emitirComprobanteFiscal({
+                venta,
+                tipo: "venta",
+                nivel: "B",
+                datosMaquina: { registro: "MAQ-0001" },
+              })
+            }
+          >
+            <Cpu className="h-4 w-4" />
+            Emisor Fiscal (Driver)
           </Boton>
           <Boton onClick={() => window.print()}>
             <Printer className="h-4 w-4" />
