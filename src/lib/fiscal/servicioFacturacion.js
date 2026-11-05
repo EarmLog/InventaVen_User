@@ -1,0 +1,81 @@
+import { db } from "@/lib/db/baseDatos";
+import { guardarFacturaFiscal, listarFacturasFiscales } from "@/lib/db/repositorios";
+import { construirComprobanteFiscal, resumirFacturacion } from "@/lib/utilidades/fiscalidad";
+import { generarId } from "@/lib/utilidades/formato";
+
+export const NIVELES_FISCAL = ["A", "B"];
+
+export async function emitirComprobanteFiscal({
+  venta,
+  tipo = "venta",
+  nivel = "A",
+  datosMaquina = null,
+}) {
+  const comprobante = construirComprobanteFiscal(venta, tipo);
+  const ahora = new Date().toISOString();
+  const prefijo = nivel === "B" ? "CTL" : "FAC";
+  const numeroControl = `${prefijo}-${String(generarId()).slice(0, 8)}`;
+  const factura = {
+    ...comprobante,
+    numeroControl,
+    nivel,
+    estado: nivel === "B" ? "enviada" : comprobante.estado,
+    registroMaquina: datosMaquina?.registro || null,
+    creadoEn: ahora,
+    actualizadoEn: ahora,
+  };
+  const id = await guardarFacturaFiscal(factura);
+  return { ...factura, id };
+}
+
+export async function listarComprobantesFiscales() {
+  return listarFacturasFiscales();
+}
+
+export async function generarReporteCierreCaja({ fecha } = {}) {
+  const ventas = await db.ventas.where("estado").equals("completada").toArray();
+  const delDia = fecha
+    ? String(fecha).slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const delDiaVentas = ventas.filter((venta) => {
+    const fechaVenta = String(venta.fecha || "").slice(0, 10);
+    return fechaVenta === delDia;
+  });
+  const resumen = resumirFacturacion(delDiaVentas);
+  return {
+    fecha: delDia,
+    totalComprobantes: resumen.totalComprobantes,
+    baseImponibleUsd: resumen.baseImponibleUsd,
+    ivaUsd: resumen.ivaUsd,
+    igtfUsd: resumen.igtfUsd,
+    totalUsd: resumen.totalUsd,
+    baseImponibleVes: resumen.baseImponibleVes,
+    ivaVes: resumen.ivaVes,
+    igtfVes: resumen.igtfVes,
+    totalVes: resumen.totalVes,
+    retencionesUsd: resumen.retencionesUsd,
+    retencionesVes: resumen.retencionesVes,
+  };
+}
+
+export async function generarReporteParcialCierreCaja({ fecha } = {}) {
+  const ventas = await db.ventas.where("estado").equals("completada").toArray();
+  const inicio = fecha ? new Date(`${String(fecha).slice(0, 10)}T00:00:00`) : new Date();
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+  const parciales = ventas.filter((venta) => {
+    const fechaVenta = new Date(venta.fecha);
+    return fechaVenta >= inicio && fechaVenta < fin;
+  });
+  const resumen = resumirFacturacion(parciales);
+  return {
+    desde: inicio.toISOString(),
+    hasta: fin.toISOString(),
+    totalComprobantes: resumen.totalComprobantes,
+    totalUsd: resumen.totalUsd,
+    ivaUsd: resumen.ivaUsd,
+    igtfUsd: resumen.igtfUsd,
+    totalVes: resumen.totalVes,
+    retencionesUsd: resumen.retencionesUsd,
+  };
+}

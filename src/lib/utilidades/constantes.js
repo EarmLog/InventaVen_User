@@ -9,6 +9,7 @@ export const TIPOS_PAGO = [
 ];
 
 export const PORCENTAJE_IVA = 16;
+export const PORCENTAJE_IGTF = 3;
 
 export const TIPOS_EMPAQUE = [
   { valor: "unidad", etiqueta: "Unidad" },
@@ -47,7 +48,9 @@ export const CLAVES_AJUSTES = {
   TASA_USD: "tasaUsd",
   TASA_ACTUALIZADA_EN: "tasaActualizadaEn",
   ULTIMA_ACTUALIZACION_PRECIOS: "ultimaActualizacionPrecios",
+  TASA_ULTIMA_APLICADA: "tasaUltimaAplicada",
   NOMBRE_NEGOCIO: "nombreNegocio",
+  ONBOARDING_VISTO: "onboardingVisto",
   SINC_NUBE: "sincronizacionNube",
 };
 
