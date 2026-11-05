@@ -5,7 +5,7 @@ import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
 import { TIPOS_PAGO } from "@/lib/utilidades/constantes";
 import { imprimirTicketTermico } from "@/lib/utilidades/impresora";
-import { emitirComprobanteFiscal } from "@/lib/fiscal/servicioFacturacion";
+import { emitirComprobanteFiscal } from "@/lib/utilidades/impresoraFiscal";
 import {
   formatearFechaHora,
   formatearNumero,
@@ -41,8 +41,8 @@ export default function ModalFactura({ abierto, venta, perfil, onCerrar }) {
             onClick={() =>
               emitirComprobanteFiscal({
                 venta,
-                tipo: "venta",
-                nivel: "B",
+                perfil,
+                tipoImpresora: "the_factory",
                 datosMaquina: { registro: "MAQ-0001" },
               })
             }
