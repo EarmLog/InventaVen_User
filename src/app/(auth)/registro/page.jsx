@@ -13,7 +13,7 @@ import { useSesion } from "@/context/SesionContext";
 import { validarContrasena } from "@/lib/seguridad/contrasena";
 
 export default function PaginaRegistro() {
-  const { sesion, registrarUsuario } = useSesion();
+  const { sesion, registrarUsuario, reenviarConfirmacion } = useSesion();
   const router = useRouter();
   const [formulario, setFormulario] = useState({
     nombreNegocio: "",
@@ -26,6 +26,7 @@ export default function PaginaRegistro() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [reenviando, setReenviando] = useState(false);
 
   useEffect(() => {
     if (sesion) router.replace("/panel");
@@ -33,6 +34,22 @@ export default function PaginaRegistro() {
 
   function cambiar(campo, valor) {
     setFormulario((anterior) => ({ ...anterior, [campo]: valor }));
+  }
+
+  async function reenviarCorreo() {
+    if (!formulario.correo.trim()) {
+      setError("Escribe un correo electrónico.");
+      return;
+    }
+    setReenviando(true);
+    try {
+      await reenviarConfirmacion(formulario.correo);
+      setMensaje("Correo de confirmación reenviado. Revisa tu bandeja de entrada.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReenviando(false);
+    }
   }
 
   async function enviar(evento) {
@@ -92,6 +109,23 @@ export default function PaginaRegistro() {
       <form onSubmit={enviar} className="mt-7 space-y-4">
         {error ? <Alerta tipo="error">{error}</Alerta> : null}
         {mensaje ? <Alerta tipo="exito">{mensaje}</Alerta> : null}
+        {mensaje ? (
+          <div className="space-y-2">
+            <Alerta tipo="info">
+              Si no recibes el correo, puedes solicitar un nuevo enlace de confirmación.
+            </Alerta>
+            <Boton
+              tipo="button"
+              variante="secundario"
+              tamano="sm"
+              onClick={reenviarCorreo}
+              cargando={reenviando}
+              disabled={reenviando}
+            >
+              Reenviar correo de confirmación
+            </Boton>
+          </div>
+        ) : null}
 
         <Campo etiqueta="Nombre del negocio" requerido>
           <div className="relative">

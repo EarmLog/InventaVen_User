@@ -14,7 +14,7 @@ import Captcha from "@/components/modules/auth/Captcha";
 import { useSesion } from "@/context/SesionContext";
 
 export default function PaginaLogin() {
-  const { sesion, iniciarSesion } = useSesion();
+  const { sesion, iniciarSesion, reenviarConfirmacion } = useSesion();
   const router = useRouter();
   const [correo, setCorreo] = useState("");
   const [contrasena, setContrasena] = useState("");
@@ -24,6 +24,8 @@ export default function PaginaLogin() {
   const [captchaTicket, setCaptchaTicket] = useState("");
   const [versionCaptcha, setVersionCaptcha] = useState(0);
   const [mostrarModalCaptcha, setMostrarModalCaptcha] = useState(false);
+  const [correoNoConfirmado, setCorreoNoConfirmado] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
 
   useEffect(() => {
     if (sesion) router.replace("/panel");
@@ -43,8 +45,27 @@ export default function PaginaLogin() {
       setContrasena("");
       setCaptchaTicket("");
       setVersionCaptcha((valor) => valor + 1);
+      setCorreoNoConfirmado(String(err.message || "").toLowerCase().includes("confirm"));
     } finally {
       setCargando(false);
+    }
+  }
+
+  async function reenviarCorreo() {
+    if (!correo.trim()) {
+      setError("Ingresa tu correo electrónico.");
+      return;
+    }
+    setReenviando(true);
+    try {
+      await reenviarConfirmacion(correo);
+      setCorreoNoConfirmado(false);
+      toast.success("Correo de confirmación reenviado. Revisa tu bandeja de entrada.");
+    } catch (err) {
+      setError(err.message);
+      setCorreoNoConfirmado(String(err.message || "").toLowerCase().includes("confirm"));
+    } finally {
+      setReenviando(false);
     }
   }
 
@@ -73,6 +94,21 @@ export default function PaginaLogin() {
 
       <form onSubmit={enviar} className="mt-8 space-y-4">
         {error ? <Alerta tipo="error">{error}</Alerta> : null}
+        {correoNoConfirmado ? (
+          <div className="space-y-2">
+            <Alerta tipo="info">{error}</Alerta>
+            <Boton
+              tipo="button"
+              variante="secundario"
+              tamano="sm"
+              onClick={reenviarCorreo}
+              cargando={reenviando}
+              disabled={reenviando}
+            >
+              Reenviar correo de confirmación
+            </Boton>
+          </div>
+        ) : null}
 
         <Campo etiqueta="Correo electrónico" requerido>
           <Entrada
