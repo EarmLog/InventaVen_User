@@ -82,6 +82,7 @@ export function construirComprobanteFiscal(venta, tipo = "venta") {
     totalRetenidoVes: redondear(retencionesVes),
     estado: "emitido",
     nivel: "A",
+    tasaBcv: Number(venta?.tasaUsd) || 0,
     porcentajeIva: esExencion ? 0 : Number(venta?.porcentajeIva || PORCENTAJE_IVA),
     creadoEn: new Date().toISOString(),
     actualizadoEn: new Date().toISOString(),
