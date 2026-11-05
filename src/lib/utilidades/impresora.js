@@ -60,8 +60,11 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   <div>
     ${(venta.items || []).map((item) => `
       <div>
-        <span>${item.cantidad}x BSS ${formatearVes(item.totalLineaVes)}</span>
-        <span>${item.nombre}</span>
+        <div><span>${item.cantidad}x BSS ${formatearVes(item.precioUnitarioVes)}</span></div>
+        <div>
+          <span>${item.nombre}</span>
+          <span class="text-right">${formatearVes(item.totalLineaVes)}</span>
+        </div>
       </div>
     `).join("")}
   </div>
