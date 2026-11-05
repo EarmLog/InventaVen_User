@@ -491,11 +491,13 @@ export async function registrarVenta({
   );
 
   const comprobante = construirComprobanteFiscal(venta, "venta");
+  const ajustesLocales = await obtenerAjustes();
   await guardarFacturaFiscal({
     ...comprobante,
     nivel: "B",
     estado: "enviada",
     registroMaquina: "MAQ-0001",
+    negocioRif: String(ajustesLocales?.[CLAVES_AJUSTES.RIF_NEGOCIO] || ""),
   });
 
   return venta;
@@ -742,7 +744,8 @@ export function calcularResumenGanancia(producto, tasaUsd = 0) {
 export async function guardarFacturaFiscal(fiscal) {
   validarBaseDatos();
   if (!fiscal) throw new Error("La factura fiscal no es válida.");
-  return db.facturasFiscales.put(fiscal);
+  const registro = { ...fiscal, id: fiscal.id || generarId() };
+  return db.facturasFiscales.put(registro);
 }
 
 export async function listarFacturasFiscales() {

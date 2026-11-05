@@ -27,6 +27,7 @@ function normalizarPerfil(perfil) {
     correo: perfil.correo,
     nombreNegocio: perfil.nombre_negocio,
     telefono: perfil.telefono || "",
+    rif: perfil.rif || perfil.rif_negocio || "",
     rol: perfil.rol,
     fechaVencimiento: perfil.fecha_vencimiento,
     ultimoAcceso: perfil.ultimo_acceso,
@@ -99,6 +100,7 @@ export async function PATCH(request) {
     const cuerpo = await request.json();
     const nombreNegocio = limpiarTexto(cuerpo.nombreNegocio, 160);
     const telefono = limpiarTexto(cuerpo.telefono, 40);
+    const rif = limpiarTexto(cuerpo.rif, 20);
     if (!nombreNegocio) {
       return NextResponse.json(
         { error: "El nombre del negocio es obligatorio." },
@@ -111,18 +113,22 @@ export async function PATCH(request) {
       .update({
         nombre_negocio: nombreNegocio,
         telefono: telefono || null,
+        rif: rif || null,
       })
       .eq("id", usuario.id)
       .select("*")
       .single();
     if (errorPerfil) throw errorPerfil;
 
+    const metadatosActualizados = {
+      ...(usuario.user_metadata || {}),
+      nombre_negocio: nombreNegocio,
+      telefono,
+    };
+    if (rif) metadatosActualizados.rif = rif;
+
     await cliente.auth.admin.updateUserById(usuario.id, {
-      user_metadata: {
-        ...(usuario.user_metadata || {}),
-        nombre_negocio: nombreNegocio,
-        telefono,
-      },
+      user_metadata: metadatosActualizados,
     });
 
     return NextResponse.json({ perfil: normalizarPerfil(perfil) });

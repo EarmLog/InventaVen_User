@@ -40,6 +40,7 @@ export default function PaginaConfiguracion() {
 
   const [nombreNegocio, setNombreNegocio] = useState("");
   const [telefono, setTelefono] = useState("");
+  const [rif, setRif] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [recalculandoPrecios, setRecalculandoPrecios] = useState(false);
 
@@ -78,7 +79,8 @@ export default function PaginaConfiguracion() {
   useEffect(() => {
     setNombreNegocio(perfil?.nombreNegocio || "");
     setTelefono(perfil?.telefono || "");
-  }, [perfil]);
+    setRif(perfil?.rif || ajustes[CLAVES_AJUSTES.RIF_NEGOCIO] || "");
+  }, [perfil, ajustes]);
 
   async function guardarNegocio() {
     if (!nombreNegocio.trim()) {
@@ -87,7 +89,8 @@ export default function PaginaConfiguracion() {
     }
     setGuardandoPerfil(true);
     try {
-      await actualizarPerfil({ nombreNegocio, telefono });
+      await actualizarPerfil({ nombreNegocio, telefono, rif });
+      await guardarAjuste(CLAVES_AJUSTES.RIF_NEGOCIO, rif);
       toast.success("Datos del negocio actualizados.");
     } catch (error) {
       toast.error(error.message);
@@ -244,6 +247,14 @@ export default function PaginaConfiguracion() {
                 onChange={(evento) => setTelefono(evento.target.value)}
                 maxLength={40}
                 placeholder="0412-0000000"
+              />
+            </Campo>
+            <Campo etiqueta="RIF del negocio">
+              <Entrada
+                value={rif}
+                onChange={(evento) => setRif(evento.target.value)}
+                maxLength={20}
+                placeholder="J-12345678-9"
               />
             </Campo>
             <div className="flex items-center justify-between rounded-xl bg-[var(--superficie-2)] px-3 py-2 text-[11px]">

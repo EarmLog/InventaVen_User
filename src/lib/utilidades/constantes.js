@@ -50,6 +50,7 @@ export const CLAVES_AJUSTES = {
   ULTIMA_ACTUALIZACION_PRECIOS: "ultimaActualizacionPrecios",
   TASA_ULTIMA_APLICADA: "tasaUltimaAplicada",
   NOMBRE_NEGOCIO: "nombreNegocio",
+  RIF_NEGOCIO: "rifNegocio",
   ONBOARDING_VISTO: "onboardingVisto",
   SINC_NUBE: "sincronizacionNube",
 };

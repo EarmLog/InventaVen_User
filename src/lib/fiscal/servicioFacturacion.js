@@ -10,6 +10,7 @@ export async function emitirComprobanteFiscal({
   tipo = "venta",
   nivel = "A",
   datosMaquina = null,
+  perfil = {},
 }) {
   const comprobante = construirComprobanteFiscal(venta, tipo);
   const ahora = new Date().toISOString();
@@ -21,6 +22,7 @@ export async function emitirComprobanteFiscal({
     nivel,
     estado: nivel === "B" ? "enviada" : comprobante.estado,
     registroMaquina: datosMaquina?.registro || null,
+    negocioRif: String(perfil?.rif || ""),
     creadoEn: ahora,
     actualizadoEn: ahora,
   };
