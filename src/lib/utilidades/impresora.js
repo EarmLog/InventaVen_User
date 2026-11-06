@@ -36,10 +36,9 @@ function abrirVentanaImpresion(html) {
   ventanaImpresion.document.write(html);
   ventanaImpresion.document.close();
   try {
-    const alturaContenido = ventanaImpresion.document.body
-      ? ventanaImpresion.document.body.scrollHeight
-      : 800;
-    ventanaImpresion.resizeTo(219, Math.max(alturaContenido, 300));
+    const pantalla = window.screen;
+    ventanaImpresion.resizeTo(pantalla.width, Math.max(pantalla.height, 800));
+    ventanaImpresion.moveTo(0, 0);
   } catch {
     ventanaImpresion.resizeTo(219, 800);
   }
