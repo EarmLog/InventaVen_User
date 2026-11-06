@@ -50,7 +50,7 @@ export async function solicitarPerfil(token, metodo = "GET", cuerpo = null) {
   });
   const datos = await respuesta.json().catch(() => ({}));
   if (!respuesta.ok) {
-    throw new Error(datos.error || "No se pudo cargar el perfil.");
+    throw new Error(datos.error || datos.detalle || "No se pudo cargar el perfil.");
   }
   return datos.perfil;
 }

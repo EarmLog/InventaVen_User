@@ -109,16 +109,27 @@ export async function PATCH(request) {
       );
     }
 
-    const { data: perfil, error: errorPerfil } = await cliente
-      .from("perfiles")
-      .update({
-        nombre_negocio: nombreNegocio,
-        telefono: telefono || null,
-        rif: rif || null,
-      })
-      .eq("id", usuario.id)
-      .select("*")
-      .single();
+    const datosBase = {
+      nombre_negocio: nombreNegocio,
+      telefono: telefono || null,
+    };
+
+    let errorPerfil = null;
+    let perfilActualizado = null;
+    for (const campoRif of ["rif", "rif_negocio"]) {
+      const resultado = await cliente
+        .from("perfiles")
+        .update({ ...datosBase, [campoRif]: rif || null })
+        .eq("id", usuario.id)
+        .select("*")
+        .single();
+      if (!resultado.error) {
+        perfilActualizado = resultado.data;
+        errorPerfil = null;
+        break;
+      }
+      errorPerfil = resultado.error;
+    }
     if (errorPerfil) throw errorPerfil;
 
     const metadatosActualizados = {
@@ -133,7 +144,7 @@ export async function PATCH(request) {
       user_metadata: metadatosActualizados,
     });
 
-    return NextResponse.json({ perfil: normalizarPerfil(perfil) });
+    return NextResponse.json({ perfil: normalizarPerfil(perfilActualizado) });
   } catch (error) {
     return NextResponse.json(
       { error: "No se pudo actualizar el perfil.", detalle: error.message },
