@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ShieldCheck, Search, Trash2, Calendar, Plus } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { eliminarCaja, listarCajas, listarMovimientosPorCaja, registrarCaja } from "@/lib/db/repositorios";
+import { GraficoVentasDias } from "@/components/modules/analisis/Graficos";
 import { generarId } from "@/lib/utilidades/formato";
 import { toast } from "sonner";
 import Tarjeta from "@/components/ui/Tarjeta";
@@ -23,6 +24,16 @@ export default function Auditoria() {
   const [cajaModal, setCajaModal] = useState(false);
   const [cajaSeleccionada, setCajaSeleccionada] = useState(null);
   const [movimientosCaja, setMovimientosCaja] = useState([]);
+  const datosGraficoCaja = useMemo(() => {
+    const porDia = {};
+    for (const mov of movimientosCaja) {
+      const dia = String(mov.fecha || "").slice(0, 10);
+      if (!dia) continue;
+      porDia[dia] = porDia[dia] || { etiqueta: dia, totalVes: 0 };
+      porDia[dia].totalVes += Number(mov.cantidad) || 0;
+    }
+    return Object.values(porDia).sort((a, b) => a.etiqueta.localeCompare(b.etiqueta));
+  }, [movimientosCaja]);
 
   const limpiarAuditoria = async () => {
     if (!confirm("¿Deseas limpiar el registro de auditoría local?")) return;
@@ -182,6 +193,10 @@ export default function Auditoria() {
                 ))}
               </div>
             )}
+          </div>
+          <div className="mt-3">
+            <h3 className="text-sm font-bold mb-2">Ventas por día</h3>
+            <GraficoVentasDias datos={datosGraficoCaja} altura={220} moneda="VES" />
           </div>
         </Tarjeta>
       )}
