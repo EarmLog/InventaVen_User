@@ -2,7 +2,7 @@ import { formatearVes } from "./formato";
 
 export async function imprimirTicketTermico(venta, negocio = {}) {
   const anchoTicket = "58mm";
-  const ventanaImpresion = window.open("", "_blank", "width=950,height=600");
+  const ventanaImpresion = window.open("", "_blank", "width=300,height=600");
   if (!ventanaImpresion) {
     throw new Error("Permite las ventanas emergentes (pop-ups) para imprimir el ticket.");
   }
@@ -14,16 +14,20 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   <title>Ticket ${venta.numeroFactura || venta.codigo}</title>
   <style>
     @page {
-      size: ${anchoTicket} auto;
-      margin: 0;
+      size: 58mm auto;
+      margin: 0mm;
+    }
+    * {
+      box-sizing: border-box;
     }
     body {
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       line-height: 1.2;
       width: 58mm;
+      max-width: 58mm;
       margin: 0 auto;
-      padding: 5px;
+      padding: 4mm;
       color: #000;
       background: #fff;
     }
@@ -44,31 +48,31 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
     <div class="font-bold" style="font-size: 13px;">${negocio.nombreNegocio || negocio.nombre || "InventaVen POS"}</div>
     <div>${negocio.descripcion || ""} ${negocio.codigoZonaPostal || negocio.codigo_postal || ""}</div>
   </div>
-
+  <br>
   <div>
     <div><strong>RAZON SOCIAL:</strong> ${venta.clienteNombre || "CLIENTE GENERICO"}</div>
     <div><strong>CI/RIF:</strong> ${venta.clienteRif || "NO CI NO RIF"}</div>
-    <div><strong>CAJA4/CAJERA:</strong> ${negocio.caja || "POS"}</div>
+    <div><strong>CAJA/CAJERA:</strong> ${negocio.caja || "POS"}</div>
     <div><strong>NO.:</strong> ${venta.numeroFactura || venta.codigo}</div>
     <div>
       <span><strong>FECHA:</strong> ${new Date(venta.fecha).toLocaleDateString()}</span>
       <span><strong>HORA:</strong> ${new Date(venta.fecha).toLocaleTimeString()}</span>
     </div>
   </div>
-  <div>--------------</div>
+  <div>--------------------------</div>
 
   <div>
     ${(venta.items || []).map((item) => `
       <div>
         <div><span>${item.cantidad}x Bs ${formatearVes(item.precioUnitarioVes)}</span></div>
-        <div>
+        <div class="flex">
           <span>${item.nombre}</span>
           <span class="text-right">${formatearVes(item.totalLineaVes)}</span>
         </div>
       </div>
     `).join("")}
   </div>
-  <div>--------------</div>
+  <div>--------------------------</div>
 
   <div>
     <div class="flex" style="margin-top: 4px;">
@@ -87,22 +91,22 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
       <span>TOTAL:</span>
       <span class="text-right">${formatearVes(venta.totalVes)}</span>
     </div>
-    <div>
+    <div class="flex">
       <span>PAGO (${venta.tipoPago}):</span>
       <span class="text-right">${formatearVes(venta.totalVes)}</span>
     </div>
-    <div>
+    <div class="flex">
       <span>CAMBIO:</span>
       <span class="text-right">${formatearVes(0)}</span>
     </div>
-    <div>
-      <span>CATIDAD:</span>
+    <div class="flex">
+      <span>CANTIDAD:</span>
       <span class="text-right">${(venta.items || []).reduce((t, i) => t + Number(i.cantidad) || 0, 0)}</span>
     </div>
   </div>
 
   <div class="text-center" style="margin-top: 10px; font-size: 10px;">
-  <div>--------------</div>
+    <div>--------------------------</div>
     <div>¡Gracias por su compra!</div>
     <div>InventaVen · Sistema POS Offline</div>
   </div>
