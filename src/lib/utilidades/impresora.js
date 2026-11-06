@@ -2,7 +2,7 @@ import { formatearVes } from "./formato";
 
 export async function imprimirTicketTermico(venta, negocio = {}) {
   const anchoTicket = "58mm";
-  const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
+  const ventanaImpresion = window.open("", "_blank", "width=950,height=600");
   if (!ventanaImpresion) {
     throw new Error("Permite las ventanas emergentes (pop-ups) para imprimir el ticket.");
   }
@@ -14,7 +14,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   <title>Ticket ${venta.numeroFactura || venta.codigo}</title>
   <style>
     @page {
-      size: ${anchoTicket};
+      size: ${anchoTicket} auto;
       margin: 0;
     }
     body {
@@ -102,6 +102,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   </div>
 
   <div class="text-center" style="margin-top: 10px; font-size: 10px;">
+  <div>--------------</div>
     <div>¡Gracias por su compra!</div>
     <div>InventaVen · Sistema POS Offline</div>
   </div>
