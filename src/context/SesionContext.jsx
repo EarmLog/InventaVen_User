@@ -17,6 +17,7 @@ export function ProveedorSesion({ children }) {
   const [sesion, setSesion] = useState(undefined);
   const [perfil, setPerfil] = useState(null);
   const [cargandoPerfil, setCargandoPerfil] = useState(false);
+  const [onboardingAbierto, setOnboardingAbierto] = useState(false);
   const montado = useRef(true);
   const perfilEnCurso = useRef(false);
 
@@ -198,6 +199,19 @@ export function ProveedorSesion({ children }) {
     }
   }, []);
 
+  const abrirOnboarding = useCallback(() => {
+    setOnboardingAbierto(true);
+  }, []);
+
+  const cerrarOnboarding = useCallback(async () => {
+    setOnboardingAbierto(false);
+    try {
+      await marcarOnboardingCompletado();
+    } catch {
+      // Se mantiene cerrado en pantalla para reintentar.
+    }
+  }, [marcarOnboardingCompletado]);
+
   const refrescarPerfil = useCallback(async () => {
     const supabase = obtenerClienteSupabase();
     const { data } = await supabase.auth.getSession();
@@ -220,6 +234,10 @@ export function ProveedorSesion({ children }) {
         cambiarClave,
         actualizarPerfil,
         marcarOnboardingCompletado,
+        abrirOnboarding,
+        cerrarOnboarding,
+        onboardingAbierto,
+        setOnboardingAbierto,
         refrescarPerfil,
       }}
     >

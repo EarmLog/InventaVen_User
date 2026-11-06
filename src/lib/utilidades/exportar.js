@@ -9,9 +9,15 @@ export function exportarExcelReporte(datos, nombreHoja = "Reporte", nombreArchiv
   XLSX.writeFile(workbook, nombreArchivo);
 }
 
-export function exportarPdfReporte({ titulo = "Reporte InventaVen", columnas = [], filas = [], nombreArchivo = "reporte.pdf" }) {
+export function exportarPdfReporte({
+  titulo = "Reporte InventaVen",
+  columnas = [],
+  filas = [],
+  nombreArchivo = "reporte.pdf",
+  negocio = null,
+}) {
   const doc = new jsPDF();
-  
+
   doc.setFontSize(16);
   doc.setTextColor(15, 23, 42);
   doc.text(titulo, 14, 20);
@@ -20,14 +26,43 @@ export function exportarPdfReporte({ titulo = "Reporte InventaVen", columnas = [
   doc.setTextColor(100, 116, 139);
   doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 26);
 
+  let y = 32;
+  if (negocio?.nombre) {
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Negocio: ${negocio.nombre}`, 14, y);
+    y += 6;
+    if (negocio.rif) doc.text(`RIF: ${negocio.rif}`, 14, y);
+    if (negocio.direccion) doc.text(`Direccion: ${negocio.direccion}`, 14, y);
+    if (negocio.zonaPostal) doc.text(`Zona Postal: ${negocio.zonaPostal}`, 14, y);
+    y += 2;
+  }
+
+  const inicioTabla = y + 4;
   autoTable(doc, {
-    startY: 32,
+    startY: inicioTabla,
     head: [columnas],
     body: filas,
     theme: "grid",
     headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: "bold" },
     styles: { fontSize: 9, cellPadding: 3 },
   });
+
+  const finalTabla = doc.lastAutoTable?.finalY || inicioTabla + 20;
+  const totales = [];
+  for (let i = 0; i < columnas.length; i += 1) {
+    let suma = 0;
+    for (const fila of filas) {
+      const valor = Number(fila[i]);
+      if (Number.isFinite(valor)) suma += valor;
+    }
+    if (suma > 0) totales.push(`${columnas[i]}: ${suma.toFixed(2)}`);
+  }
+  if (totales.length) {
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Total: ${totales.join(" | ")}`, 14, finalTabla + 6);
+  }
 
   doc.save(nombreArchivo);
 }

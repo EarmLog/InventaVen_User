@@ -34,12 +34,11 @@ function PantallaCargando({ texto = "Preparando tu panel..." }) {
 
 function ContenidoPanel({ children }) {
   const router = useRouter();
-  const { sesion, perfil, cargandoPerfil, refrescarPerfil, marcarOnboardingCompletado } = useSesion();
+  const { sesion, perfil, cargandoPerfil, refrescarPerfil, onboardingAbierto, setOnboardingAbierto, abrirOnboarding, cerrarOnboarding, marcarOnboardingCompletado } = useSesion();
   const { tasa } = useTasa();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [autoPrecios, setAutoPrecios] = useState(false);
   const [ultimaTasaAplicada, setUltimaTasaAplicada] = useState(null);
-  const [onboardingAbierto, setOnboardingAbierto] = useState(false);
 
   useEffect(() => {
     if (sesion === null) router.replace("/login");
@@ -97,20 +96,6 @@ function ContenidoPanel({ children }) {
       activo = false;
     };
   }, [sesion]);
-
-  async function cerrarOnboarding() {
-    setOnboardingAbierto(false);
-    try {
-      await guardarAjuste(CLAVES_AJUSTES.ONBOARDING_VISTO, true);
-    } catch {
-      // Se mantiene cerrado en pantalla para reintentar.
-    }
-    try {
-      await marcarOnboardingCompletado();
-    } catch {
-      // El indicador local ya quedó marcado.
-    }
-  }
 
   useEffect(() => {
     if (!autoPrecios || !tasa || !sesion) return;

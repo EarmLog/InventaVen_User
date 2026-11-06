@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { FileText, Download, Filter, Calendar, Send } from "lucide-react";
+import { FileText, Download, Filter, Calendar, Send, Printer } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { resumirFacturacion } from "@/lib/utilidades/fiscalidad";
 import { exportarExcelReporte, exportarPdfReporte } from "@/lib/utilidades/exportar";
@@ -12,6 +12,7 @@ import {
   generarReporteParcialCierreCaja,
 } from "@/lib/fiscal/servicioFacturacion";
 import { toast } from "sonner";
+import { useSesion } from "@/context/SesionContext";
 import Tarjeta from "@/components/ui/Tarjeta";
 import Boton from "@/components/ui/Boton";
 import Entrada from "@/components/ui/Entrada";
@@ -19,6 +20,7 @@ import Etiqueta from "@/components/ui/Etiqueta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 
 export default function Fiscalidad() {
+  const { perfil } = useSesion();
   const ventas = useLiveQuery(() => (db ? db.ventas.toArray() : []), [], []) || [];
   const facturas = useLiveQuery(
     () => (db ? db.facturasFiscales.orderBy("fecha").reverse().toArray() : []),
@@ -96,6 +98,66 @@ export default function Fiscalidad() {
     }
   }
 
+
+  const imprimirSeniat = async () => {
+    try {
+      const filas = facturasFiltradas.length > 0
+        ? facturasFiltradas.map((f) => [
+            f.numeroFactura || "S/N",
+            f.fecha ? f.fecha.slice(0, 10) : "",
+            f.tipo || "venta",
+            `${Number(f.baseImponibleVes || 0).toFixed(2)} VES`,
+            `${Number(f.ivaVes || 0).toFixed(2)} VES`,
+            `${Number(f.totalVes || 0).toFixed(2)} VES`,
+            `${Number(f.baseImponibleUsd || 0).toFixed(2)} USD`,
+            `${Number(f.ivaUsd || 0).toFixed(2)} USD`,
+            `${Number(f.totalUsd || 0).toFixed(2)} USD`,
+          ])
+        : ventasFiltradas.map((v) => [
+            v.codigo || v.id.slice(0, 8),
+            v.fecha ? v.fecha.slice(0, 10) : "",
+            "venta",
+            `${Number(v.baseVes || 0).toFixed(2)} VES`,
+            `${Number(v.ivaVes || 0).toFixed(2)} VES`,
+            `${Number(v.totalVes || 0).toFixed(2)} VES`,
+            `${Number(v.baseUsd || 0).toFixed(2)} USD`,
+            `${Number(v.ivaUsd || 0).toFixed(2)} USD`,
+            `${Number(v.totalUsd || 0).toFixed(2)} USD`,
+          ]);
+
+      if (filas.length === 0) {
+        toast.error("No hay datos para imprimir en el rango seleccionado.");
+        return;
+      }
+
+      await exportarPdfReporte({
+        titulo: `Declaracion_Fiscal y Tributaria (${fechaInicio || "Inicio"} al ${fechaFin || "Hoy"})`,
+        columnas: [
+          "Nro / Comprobante",
+          "Fecha",
+          "Tipo",
+          "Base Imponible (VES)",
+          "IVA (VES)",
+          "Total (VES)",
+          "Base Imponible (USD)",
+          "IVA (USD)",
+          "Total (USD)",
+        ],
+        filas,
+        nombreArchivo: `Declaracion_Fiscal_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.pdf`,
+        negocio: {
+          nombre: perfil?.nombreNegocio || null,
+          rif: perfil?.rif || null,
+          direccion: perfil?.direccion || null,
+          zonaPostal: perfil?.zonaPostal || null,
+        },
+      });
+      toast.success("Reporte fiscal enviado a imprimir.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al imprimir el reporte fiscal.");
+    }
+  };
 
   const exportarExcelSeniat = () => {
     try {
@@ -185,6 +247,12 @@ export default function Fiscalidad() {
         ],
         filas,
         nombreArchivo: `Declaracion_Fiscal_${fechaInicio || "inicio"}_al_${fechaFin || "hoy"}.pdf`,
+        negocio: {
+          nombre: perfil?.nombreNegocio || null,
+          rif: perfil?.rif || null,
+          direccion: perfil?.direccion || null,
+          zonaPostal: perfil?.zonaPostal || null,
+        },
       });
       toast.success("Reporte PDF para declaración generado exitosamente.");
     } catch (error) {
@@ -195,74 +263,50 @@ export default function Fiscalidad() {
 
   return (
     <div className="space-y-4">
-      {/* Filtro de fechas y botones de exportación */}
+      {/* Filtro de fechas */}
       <Tarjeta className="p-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-xs font-semibold text-[var(--texto-suave)] block mb-1">Desde</label>
-              <Entrada
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-[var(--texto-suave)] block mb-1">Hasta</label>
-              <Entrada
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-              />
-            </div>
-            {(fechaInicio || fechaFin) && (
-              <Boton
-                variante="secundario"
-                onClick={() => {
-                  setFechaInicio("");
-                  setFechaFin("");
-                }}
-              >
-                Limpiar filtro
-              </Boton>
-            )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div>
+            <label className="text-xs font-semibold text-[var(--texto-suave)] block mb-1">Desde</label>
+            <Entrada
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+            />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div>
+            <label className="text-xs font-semibold text-[var(--texto-suave)] block mb-1">Hasta</label>
+            <Entrada
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+            />
+          </div>
+          {(fechaInicio || fechaFin) && (
             <Boton
               variante="secundario"
-              onClick={() => emitirComprobante(ventasFiltradas[0], "A")}
-              cargando={emitiendo}
-              disabled={!ventasFiltradas[0]}
+              onClick={() => {
+                setFechaInicio("");
+                setFechaFin("");
+              }}
             >
-              <Send className="h-4 w-4" />
-              Emitir comprobante (A)
+              Limpiar filtro
             </Boton>
-            <Boton
-              variante="primario"
-              onClick={() => emitirComprobante(ventasFiltradas[0], "B")}
-              cargando={emitiendo}
-              disabled={!ventasFiltradas[0]}
-            >
-              <Send className="h-4 w-4" />
-              Emitir comprobante (B)
-            </Boton>
-            <Boton variante="secundario" onClick={generarCierreCaja} disabled={!ventasFiltradas.length}>
-              <Download className="h-4 w-4" />
-              Reporte Z (cierre)
-            </Boton>
-            <Boton variante="secundario" onClick={generarParcialCierreCaja} disabled={!ventasFiltradas.length}>
-              <Download className="h-4 w-4" />
-              Reporte X (parcial)
-            </Boton>
-            <Boton variante="secundario" onClick={exportarExcelSeniat} className="inline-flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Exportar Excel (Tributario)
-            </Boton>
-            <Boton variante="primario" onClick={exportarPdfSeniat} className="inline-flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Exportar PDF (Tributario)
-            </Boton>
-          </div>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Boton variante="secundario" onClick={imprimirSeniat}>
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </Boton>
+          <Boton variante="secundario" onClick={exportarExcelSeniat} className="inline-flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Exportar Excel (Tributario)
+          </Boton>
+          <Boton variante="primario" onClick={exportarPdfSeniat} className="inline-flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Exportar PDF (Tributario)
+          </Boton>
         </div>
       </Tarjeta>
 

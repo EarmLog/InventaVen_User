@@ -34,7 +34,7 @@ import { formatearFechaHora, formatearNumero, formatearVes } from "@/lib/utilida
 
 export default function PaginaConfiguracion() {
   const router = useRouter();
-  const { perfil, actualizarPerfil, cambiarClave, cerrarSesion } = useSesion();
+  const { perfil, actualizarPerfil, cambiarClave, cerrarSesion, abrirOnboarding } = useSesion();
   const { tasa, fechaTasa, fuente, cargandoTasa, errorTasa, refrescarTasa } = useTasa();
   const { tema, cambiarTema } = useTema();
 
@@ -261,6 +261,9 @@ export default function PaginaConfiguracion() {
               <span className="text-[var(--texto-suave)]">Correo de la cuenta</span>
               <strong>{perfil?.correo || "—"}</strong>
             </div>
+            <Boton variante="secundario" onClick={abrirOnboarding} className="w-full">
+              Ver tutorial
+            </Boton>
             <Boton onClick={guardarNegocio} cargando={guardandoPerfil} className="w-full">
               Guardar cambios
             </Boton>
