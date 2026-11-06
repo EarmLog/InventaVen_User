@@ -74,7 +74,7 @@ ${CSS_TICKET}
   <div>
     ${(venta.items || []).map((item) => `
       <div>
-        <div><span>${item.cantidad}x Bs ${formatearVes(item.precioUnitarioVes)}</span></div>
+        <div><span>${item.cantidad}x ${formatearVes(item.precioUnitarioVes)}</span></div>
         <div class="flex">
           <span>${item.nombre}</span>
           <span class="text-right">${formatearVes(item.totalLineaVes)}</span>
@@ -90,11 +90,11 @@ ${CSS_TICKET}
       <span class="text-right">${formatearVes(venta.totalVes)}</span>
     </div>
     <div class="flex" style="margin-top: 2px;">
-      <span>BI G (${venta.porcentajeIva || 16},00%):</span>
+      <span>BI (${venta.porcentajeIva || 16},00%):</span>
       <span class="text-right">${formatearVes(venta.baseVes)}</span>
     </div>
     <div class="flex" style="margin-top: 2px;">
-      <span>IVA G (${venta.porcentajeIva || 16},00):</span>
+      <span>IVA (${venta.porcentajeIva || 16},00):</span>
       <span class="text-right">${formatearVes(venta.ivaVes)}</span>
     </div>
     <div class="flex font-bold" style="margin-top: 4px;">
@@ -110,7 +110,7 @@ ${CSS_TICKET}
       <span class="text-right">${formatearVes(0)}</span>
     </div>
     <div>
-      <span>CATIDAD:</span>
+      <span>CANTIDAD:</span>
       <span class="text-right">${(venta.items || []).reduce((t, i) => t + Number(i.cantidad) || 0, 0)}</span>
     </div>
   </div>
@@ -169,7 +169,7 @@ ${CSS_TICKET}
       },
     ]).map((item) => `
       <div>
-        <div><span>${item.cantidad}x Bs ${formatearVes(item.precioUnitarioVes)}</span></div>
+        <div><span>${item.cantidad}x ${formatearVes(item.precioUnitarioVes)}</span></div>
         <div class="flex">
           <span>${item.nombre}</span>
           <span class="text-right">${formatearVes(item.totalLineaVes)}</span>
@@ -193,7 +193,7 @@ ${CSS_TICKET}
       <span class="text-right">${formatearVes(compra.totalVes)}</span>
     </div>
     <div>
-      <span>CATIDAD:</span>
+      <span>CANTIDAD:</span>
       <span class="text-right">${compra.cantidad}</span>
     </div>
   </div>
