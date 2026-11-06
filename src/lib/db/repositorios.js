@@ -840,6 +840,14 @@ export async function eliminarCaja(id) {
   return db.cajas.delete(id);
 }
 
+export async function listarMovimientosPorCaja(cajaId) {
+  validarBaseDatos();
+  const movimientos = await db.movimientos.toArray();
+  return movimientos
+    .filter((m) => m.cajaId === cajaId)
+    .sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+}
+
 export async function registrarAuditoria({
   usuarioId = "local",
   accion,

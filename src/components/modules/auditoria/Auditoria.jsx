@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ShieldCheck, Search, Trash2, Calendar, Plus } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
-import { eliminarCaja, listarCajas, registrarCaja } from "@/lib/db/repositorios";
+import { eliminarCaja, listarCajas, listarMovimientosPorCaja, registrarCaja } from "@/lib/db/repositorios";
 import { generarId } from "@/lib/utilidades/formato";
 import { toast } from "sonner";
 import Tarjeta from "@/components/ui/Tarjeta";
@@ -20,6 +20,9 @@ export default function Auditoria() {
   const [cajaCodigo, setCajaCodigo] = useState("");
   const [cajaContrasena, setCajaContrasena] = useState("");
   const [cajaEstado, setCajaEstado] = useState("activa");
+  const [cajaModal, setCajaModal] = useState(false);
+  const [cajaSeleccionada, setCajaSeleccionada] = useState(null);
+  const [movimientosCaja, setMovimientosCaja] = useState([]);
 
   const limpiarAuditoria = async () => {
     if (!confirm("¿Deseas limpiar el registro de auditoría local?")) return;
@@ -36,10 +39,11 @@ export default function Auditoria() {
     try {
       const existentes = await listarCajas();
       const secuencial = `Caja${existentes.length + 1}`;
+      const codigoCaja = `${Math.floor(1000 + Math.random() * 9000)}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
       await registrarCaja({
         nombre: secuencial,
-        codigo: generarId(),
-        contrasena: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        codigo: codigoCaja,
+        contrasena: codigoCaja,
         estado: "activa",
         creador: "local",
       });
@@ -66,6 +70,19 @@ export default function Auditoria() {
       console.error(error);
       toast.error("Error al sellar la caja.");
     }
+  };
+
+  const abrirCajaModal = async (caja) => {
+    setCajaSeleccionada(caja);
+    setMovimientosCaja([]);
+    try {
+      const movimientos = await listarMovimientosPorCaja(caja.id);
+      setMovimientosCaja(movimientos);
+    } catch (error) {
+      console.error(error);
+      setMovimientosCaja([]);
+    }
+    setCajaModal(true);
   };
 
   const eliminarCajaHandler = async (id) => {
@@ -103,13 +120,11 @@ export default function Auditoria() {
               >
                 <div>
                   <p className="font-bold">{caja.nombre}</p>
-                  <p className="text-[10px] text-[var(--texto-suave)]">{caja.codigo}</p>
+                  <p className="text-[10px] text-[var(--texto-suave)]">Usuario: {caja.codigo}</p>
+                  <p className="text-[10px] text-[var(--texto-suave)]">Clave: {caja.contrasena}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Boton variante="secundario" onClick={() => cerrarCaja(caja.id)}>
-                    Serrear
-                  </Boton>
-                  <Boton variante="secundario" onClick={() => toast.info("Revisión de caja en desarrollo.")}>
+                  <Boton variante="secundario" onClick={() => abrirCajaModal(caja)}>
                     Revisar
                   </Boton>
                   <Boton variante="peligro" onClick={() => eliminarCajaHandler(caja.id)}>
@@ -133,6 +148,43 @@ export default function Auditoria() {
           </Boton>
         )}
       </div>
+
+      {cajaModal && cajaSeleccionada && (
+        <Tarjeta className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">Caja {cajaSeleccionada.nombre}</h2>
+            <Boton variante="secundario" onClick={() => setCajaModal(false)}>
+              Cerrar
+            </Boton>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div>
+              <strong>Usuario:</strong> {cajaSeleccionada.codigo}
+            </div>
+            <div>
+              <strong>Clave:</strong> {cajaSeleccionada.contrasena}
+            </div>
+            <div>
+              <strong>Estado:</strong> {cajaSeleccionada.estado}
+            </div>
+          </div>
+          <div className="mt-3">
+            <h3 className="text-sm font-bold mb-2">Movimientos</h3>
+            {movimientosCaja.length === 0 ? (
+              <p className="text-[11px] text-[var(--texto-suave)]">Sin movimientos registrados para esta caja.</p>
+            ) : (
+              <div className="space-y-2">
+                {movimientosCaja.map((mov) => (
+                  <div key={mov.id} className="flex items-center justify-between gap-2 border-b border-[var(--borde)] pb-2 text-[11px] last:border-b-0 last:pb-0">
+                    <span>{mov.tipo}</span>
+                    <span>{mov.fecha}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Tarjeta>
+      )}
 
       {auditorias.length === 0 ? (
         <EstadoVacio
