@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { FileText, Download, Filter, Calendar, Send, Printer } from "lucide-react";
+import { FileText, Download, Filter, Calendar, Send, Printer, Trash2 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
-import { resumirFacturacion } from "@/lib/utilidades/fiscalidad";
+import { resumirFacturacion, resumirCompras } from "@/lib/utilidades/fiscalidad";
+import { eliminarCompra } from "@/lib/db/repositorios";
+import { imprimirComprobanteCompra } from "@/lib/utilidades/impresora";
 import { exportarExcelReporte, exportarPdfReporte } from "@/lib/utilidades/exportar";
 import {
   emitirComprobanteFiscal,
@@ -27,6 +29,8 @@ export default function Fiscalidad() {
     [],
     []
   ) || [];
+
+  const compras = useLiveQuery(() => (db ? db.compras.orderBy("fecha").reverse().toArray() : []), [], []) || [];
 
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -52,6 +56,18 @@ export default function Fiscalidad() {
       return true;
     });
   }, [facturas, fechaInicio, fechaFin]);
+
+  const comprasFiltradas = useMemo(() => {
+    return compras.filter((compra) => {
+      if (!compra.fecha) return true;
+      const fechaCompra = compra.fecha.slice(0, 10);
+      if (fechaInicio && fechaCompra < fechaInicio) return false;
+      if (fechaFin && fechaCompra > fechaFin) return false;
+      return true;
+    });
+  }, [compras, fechaInicio, fechaFin]);
+
+  const resumenCompras = useMemo(() => resumirCompras(comprasFiltradas), [comprasFiltradas]);
 
   const resumen = useMemo(() => resumirFacturacion(ventasFiltradas), [ventasFiltradas]);
 
@@ -98,6 +114,30 @@ export default function Fiscalidad() {
     }
   }
 
+
+  async function imprimirCompra(compra) {
+    try {
+      await imprimirComprobanteCompra(compra, {
+        nombre: perfil?.nombreNegocio,
+        rif: perfil?.rif,
+        descripcion: perfil?.descripcion,
+        codigoZonaPostal: perfil?.codigoZonaPostal,
+        caja: perfil?.caja,
+      });
+      toast.success("Comprobante de compra enviado a imprimir.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo imprimir la compra.");
+    }
+  }
+
+  async function eliminarCompraRegistrada(compra) {
+    try {
+      await eliminarCompra(compra.id);
+      toast.success("Compra eliminada.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo eliminar la compra.");
+    }
+  }
 
   const imprimirSeniat = async () => {
     try {
@@ -351,6 +391,51 @@ export default function Fiscalidad() {
           </p>
         </Tarjeta>
       </div>
+
+      <Tarjeta className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 className="text-sm font-bold">Compras registradas</h3>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
+            Total: {resumenCompras.totalUsd.toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
+          </span>
+        </div>
+        {comprasFiltradas.length === 0 ? (
+          <EstadoVacio
+            icono={FileText}
+            titulo="Sin compras en este rango"
+            descripcion="No se encontraron compras registradas para las fechas seleccionadas."
+          />
+        ) : (
+          <div className="space-y-2">
+            {comprasFiltradas.slice(0, 30).map((compra) => (
+              <div
+                key={compra.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--borde)] pb-2 text-[11px] last:border-b-0 last:pb-0"
+              >
+                <div>
+                  <p className="font-semibold">{compra.numeroFactura || compra.codigo || "Compra local"}</p>
+                  <p className="text-[10px] text-[var(--texto-suave)]">{compra.fecha}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="uppercase text-[10px] font-semibold text-[var(--texto-suave)]">
+                    {compra.tipo || "compra"}
+                  </span>
+                  <span className="font-semibold">
+                    {Number(compra.totalUsd || 0).toLocaleString("es-VE", { maximumFractionDigits: 2 })} USD
+                  </span>
+                  <Boton variante="secundario" onClick={() => imprimirCompra(compra)}>
+                    <Printer className="h-4 w-4" />
+                    Imprimir
+                  </Boton>
+                  <Boton variante="peligro" onClick={() => eliminarCompraRegistrada(compra)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Boton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Tarjeta>
 
       {facturasFiltradas.length === 0 && ventasFiltradas.length === 0 ? (
         <EstadoVacio

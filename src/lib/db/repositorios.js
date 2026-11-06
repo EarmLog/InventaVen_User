@@ -282,6 +282,43 @@ export async function renovarStock({
         cantidad: cantidadNumero,
         fecha: ahora,
       });
+
+      const compraUsdNumero = Number(compraUsd);
+      const compraVesNumero = Number(compraVes);
+      if (Number.isFinite(compraUsdNumero) && compraUsdNumero > 0) {
+        const compraTotalUsd = redondear(compraUsdNumero);
+        const compraTotalVes = redondear(
+          Number.isFinite(compraVesNumero) && compraVesNumero > 0
+            ? compraVesNumero
+            : compraUsdNumero * (tasa > 0 ? tasa : 0)
+        );
+        await db.compras.put({
+          id: generarId(),
+          fecha: ahora,
+          tipo: "compra",
+          estado: "registrada",
+          productoId,
+          varianteId,
+          productoNombre: producto.nombre,
+          cantidad: cantidadNumero,
+          precioCompraUsd: compraTotalUsd,
+          precioCompraVes: compraTotalVes,
+          totalUsd: compraTotalUsd,
+          totalVes: compraTotalVes,
+          baseImponibleUsd: compraTotalUsd,
+          baseImponibleVes: compraTotalVes,
+          ivaUsd: 0,
+          ivaVes: 0,
+          igtfUsd: 0,
+          igtfVes: 0,
+          retencionesUsd: 0,
+          retencionesVes: 0,
+          proveedorId: producto.proveedorId || null,
+          proveedorNombre: producto.proveedorNombre || null,
+          creadoEn: ahora,
+          updatedAt: ahora,
+        });
+      }
       return producto;
     }
   );
@@ -763,6 +800,12 @@ export async function guardarCompraFiscal(compra) {
 export async function listarComprasFiscales() {
   validarBaseDatos();
   return db.compras.orderBy("fecha").reverse().toArray();
+}
+
+export async function eliminarCompra(id) {
+  validarBaseDatos();
+  if (!id) throw new Error("La compra no es válida.");
+  return db.compras.delete(id);
 }
 
 export async function registrarAuditoria({
