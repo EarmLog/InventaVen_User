@@ -28,13 +28,21 @@ const CSS_TICKET = `
 `;
 
 function abrirVentanaImpresion(html) {
-  const ventanaImpresion = window.open("", "_blank", "width=350,height=600");
+  const ventanaImpresion = window.open("", "_blank", "width=219,height=800");
   if (!ventanaImpresion) {
     throw new Error("Permite las ventanas emergentes (pop-ups) para imprimir el ticket.");
   }
   ventanaImpresion.document.open();
   ventanaImpresion.document.write(html);
   ventanaImpresion.document.close();
+  try {
+    const alturaContenido = ventanaImpresion.document.body
+      ? ventanaImpresion.document.body.scrollHeight
+      : 800;
+    ventanaImpresion.resizeTo(219, Math.max(alturaContenido, 300));
+  } catch {
+    ventanaImpresion.resizeTo(219, 800);
+  }
 }
 
 export async function imprimirTicketTermico(venta, negocio = {}) {
