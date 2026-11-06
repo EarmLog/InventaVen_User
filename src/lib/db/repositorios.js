@@ -808,6 +808,38 @@ export async function eliminarCompra(id) {
   return db.compras.delete(id);
 }
 
+export async function registrarCaja({
+  nombre,
+  codigo,
+  contrasena,
+  estado = "activa",
+  creador = "local",
+} = {}) {
+  validarBaseDatos();
+  if (!nombre) throw new Error("El nombre de la caja es obligatorio.");
+  const registro = {
+    id: generarId(),
+    nombre,
+    codigo,
+    contrasena,
+    estado,
+    creador,
+    fechaCreacion: new Date().toISOString(),
+  };
+  return db.cajas.add(registro);
+}
+
+export async function listarCajas() {
+  validarBaseDatos();
+  return db.cajas.orderBy("nombre").toArray();
+}
+
+export async function eliminarCaja(id) {
+  validarBaseDatos();
+  if (!id) throw new Error("La caja no es válida.");
+  return db.cajas.delete(id);
+}
+
 export async function registrarAuditoria({
   usuarioId = "local",
   accion,
