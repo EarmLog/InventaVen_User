@@ -15,7 +15,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   <style>
     @page {
       size: 58mm auto;
-      margin: 0mm;
+      margin: 0;
     }
     * {
       box-sizing: border-box;
@@ -25,8 +25,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
       font-size: 11px;
       line-height: 1.2;
       width: 58mm;
-      max-width: 58mm;
-      margin: 0 auto;
+      margin: 0;
       padding: 4mm;
       color: #000;
       background: #fff;
