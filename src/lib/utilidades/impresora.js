@@ -14,7 +14,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
   <title>Ticket ${venta.numeroFactura || venta.codigo}</title>
   <style>
     @page {
-      size: ${anchoTicket};
+      size: ${anchoTicket} auto;
       margin: 0;
     }
     body {
