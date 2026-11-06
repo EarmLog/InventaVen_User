@@ -19,8 +19,8 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 11px;
-      line-height: 1.2;
+      font-size: 9px;
+      line-height: 1.25;
       width: 58mm;
       margin: 0 auto;
       padding: 5px;
@@ -61,7 +61,7 @@ export async function imprimirTicketTermico(venta, negocio = {}) {
     ${(venta.items || []).map((item) => `
       <div>
         <div><span>${item.cantidad}x Bs ${formatearVes(item.precioUnitarioVes)}</span></div>
-        <div>
+        <div class="flex">
           <span>${item.nombre}</span>
           <span class="text-right">${formatearVes(item.totalLineaVes)}</span>
         </div>
