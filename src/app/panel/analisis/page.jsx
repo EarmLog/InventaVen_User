@@ -11,10 +11,12 @@ import {
   FileSpreadsheet,
   FileText,
   Minus,
+  Printer,
   ReceiptText,
   ShoppingBag,
   TrendingUp,
   TriangleAlert,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/db/baseDatos";
@@ -47,7 +49,9 @@ import {
   obtenerPeriodoAnterior,
   rankingProductos,
 } from "@/lib/utilidades/analisis";
-import { resumirFacturacion } from "@/lib/utilidades/fiscalidad";
+import { resumirFacturacion, resumirCompras } from "@/lib/utilidades/fiscalidad";
+import { eliminarCompra } from "@/lib/db/repositorios";
+import { imprimirComprobanteCompra } from "@/lib/utilidades/impresora";
 import {
   fechaParaInput,
   formatearFecha,
@@ -169,6 +173,12 @@ export default function PaginaAnalisis() {
     ) || [];
   const productos =
     useLiveQuery(() => (db ? db.productos.toArray() : []), [], []) || [];
+  const compras =
+    useLiveQuery(
+      () => (db ? db.compras.orderBy("fecha").reverse().toArray() : []),
+      [],
+      []
+    ) || [];
   const [desde, setDesde] = useState(() =>
     fechaParaInput(sumarDias(new Date(), -29))
   );
@@ -274,6 +284,21 @@ export default function PaginaAnalisis() {
   );
 
   const facturacionFiscal = useMemo(() => resumirFacturacion(enRango), [enRango]);
+
+  const comprasEnRango = useMemo(() => {
+    const desdeLimite = desde ? new Date(`${desde}T00:00:00`) : null;
+    const hastaLimite = hasta ? new Date(`${hasta}T23:59:59`) : null;
+    return compras.filter((compra) => {
+      if (compra.estado === "cancelada") return false;
+      if (!compra.fecha) return true;
+      const fechaCompra = new Date(compra.fecha);
+      if (desdeLimite && fechaCompra < desdeLimite) return false;
+      if (hastaLimite && fechaCompra > hastaLimite) return false;
+      return true;
+    });
+  }, [compras, desde, hasta]);
+
+  const resumenCompras = useMemo(() => resumirCompras(comprasEnRango), [comprasEnRango]);
 
   const datosPagos = useMemo(() => {
     return TIPOS_PAGO.map((tipo) => {
@@ -458,6 +483,30 @@ export default function PaginaAnalisis() {
       toast.success("PDF generado correctamente.");
     } catch {
       toast.error("No se pudo generar el PDF.");
+    }
+  }
+
+  async function imprimirCompra(compra) {
+    try {
+      await imprimirComprobanteCompra(compra, {
+        nombre: perfil?.nombreNegocio,
+        rif: perfil?.rif,
+        descripcion: perfil?.descripcion,
+        codigoZonaPostal: perfil?.codigoZonaPostal,
+        caja: perfil?.caja,
+      });
+      toast.success("Comprobante de compra enviado a imprimir.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo imprimir la compra.");
+    }
+  }
+
+  async function eliminarCompraRegistrada(compra) {
+    try {
+      await eliminarCompra(compra.id);
+      toast.success("Compra eliminada.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo eliminar la compra.");
     }
   }
 
@@ -819,6 +868,78 @@ export default function PaginaAnalisis() {
           <MapaCalorHorarios resumen={resumenHorario} moneda={moneda} />
         </Tarjeta>
       </div>
+
+      <Tarjeta className="p-4 sm:p-5">
+        <div className="mb-2">
+          <h2 className="text-sm font-bold">Compras registradas</h2>
+          <p className="text-[11px] text-[var(--texto-suave)]">
+            Compras y gastos de reposición del período seleccionado.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Indicador
+            Icono={ShoppingBag}
+            etiqueta="Compras del período"
+            valor={formatearMonto(resumenCompras.totalUsd, resumenCompras.totalVes, moneda)}
+            detalle={`${comprasEnRango.length} compra${comprasEnRango.length === 1 ? "" : "s"} registrada${comprasEnRango.length === 1 ? "" : "s"}`}
+            tono="azul"
+          />
+          <Indicador
+            Icono={CircleDollarSign}
+            etiqueta="Base imponible de compras"
+            valor={formatearMonto(
+              resumenCompras.baseImponibleUsd,
+              resumenCompras.baseImponibleVes,
+              moneda
+            )}
+            detalle="Costo total de las compras"
+          />
+        </div>
+        {comprasEnRango.length === 0 ? (
+          <EstadoVacio
+            icono={ShoppingBag}
+            titulo="Sin compras en el período"
+            descripcion="No se registraron compras para las fechas seleccionadas."
+          />
+        ) : (
+          <div className="mt-3 space-y-2">
+            {comprasEnRango.slice(0, 12).map((compra) => (
+              <div
+                key={compra.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--borde)] pb-2 text-[11px] last:border-b-0 last:pb-0"
+              >
+                <div>
+                  <p className="font-semibold">{compra.numeroFactura || compra.codigo || "Compra local"}</p>
+                  <p className="text-[10px] text-[var(--texto-suave)]">{compra.fecha}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="uppercase text-[10px] font-semibold text-[var(--texto-suave)]">
+                    {compra.tipo || "compra"}
+                  </span>
+                  <span className="font-semibold">
+                    {formatearMonto(compra.totalUsd, compra.totalVes, moneda)}
+                  </span>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => imprimirCompra(compra)}
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Imprimir
+                  </Boton>
+                  <Boton
+                    variante="peligro"
+                    tamano="sm"
+                    onClick={() => eliminarCompraRegistrada(compra)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Boton>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Tarjeta>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
         <Tarjeta className="p-4 sm:p-5">
