@@ -136,10 +136,10 @@ export default function Auditoria() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Boton variante="secundario" onClick={() => abrirCajaModal(caja)}>
-                    Revisar
+                    Ver
                   </Boton>
                   <Boton variante="peligro" onClick={() => eliminarCajaHandler(caja.id)}>
-                    Eliminar
+                    Cerrar
                   </Boton>
                 </div>
               </div>
@@ -161,7 +161,8 @@ export default function Auditoria() {
       </div>
 
       {cajaModal && cajaSeleccionada && (
-        <Tarjeta className="p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Tarjeta className="w-full max-w-md p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-sm font-bold">Caja {cajaSeleccionada.nombre}</h2>
             <Boton variante="secundario" onClick={() => setCajaModal(false)}>
@@ -198,7 +199,8 @@ export default function Auditoria() {
             <h3 className="text-sm font-bold mb-2">Ventas por día</h3>
             <GraficoVentasDias datos={datosGraficoCaja} altura={220} moneda="VES" />
           </div>
-        </Tarjeta>
+          </Tarjeta>
+        </div>
       )}
 
       {auditorias.length === 0 ? (
