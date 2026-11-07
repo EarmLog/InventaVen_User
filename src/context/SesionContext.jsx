@@ -126,6 +126,10 @@ export function ProveedorSesion({ children }) {
         },
       });
       if (error) throw new Error(traducirErrorAuth(error));
+      if (data.session) {
+        await supabase.auth.signOut();
+        return { user: data.user, session: null };
+      }
       return data;
     },
     []
