@@ -140,9 +140,17 @@ export async function PATCH(request) {
     if (rif) metadatosActualizados.rif = rif;
     metadatosActualizados.onboardingVisto = onboardingVisto;
 
-    await cliente.auth.admin.updateUserById(usuario.id, {
-      user_metadata: metadatosActualizados,
-    });
+    try {
+      const { error: errorMetadata } = await cliente.auth.admin.updateUserById(
+        usuario.id,
+        { user_metadata: metadatosActualizados }
+      );
+      if (errorMetadata) {
+        console.error("No se pudo actualizar la metadata del usuario:", errorMetadata.message);
+      }
+    } catch (errorMetadata) {
+      console.error("No se pudo actualizar la metadata del usuario:", errorMetadata?.message);
+    }
 
     return NextResponse.json({ perfil: normalizarPerfil(perfilActualizado) });
   } catch (error) {
