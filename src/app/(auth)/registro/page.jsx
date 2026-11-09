@@ -72,6 +72,7 @@ export default function PaginaRegistro() {
       }
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setCargando(false);
     }

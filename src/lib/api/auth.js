@@ -13,11 +13,14 @@ export function traducirErrorAuth(error) {
   if (mensaje.includes("password should be at least")) {
     return "La contraseña debe tener al menos 6 caracteres.";
   }
-  if (mensaje.includes("unable to validate email address")) {
-    return "El correo electrónico no es válido.";
+  if (mensaje.includes("unable to validate email address") || mensaje.includes("email address") || mensaje.includes("invalid email")) {
+    return "El correo electrónico no es válido o está en un formato no permitido.";
   }
-  if (mensaje.includes("rate limit")) {
+  if (mensaje.includes("rate limit") || mensaje.includes("over_email_send_rate_limit")) {
     return "Demasiados intentos. Espera unos minutos e intenta de nuevo.";
+  }
+  if (mensaje.includes("signups not allowed")) {
+    return "El registro de nuevos usuarios está deshabilitado temporalmente.";
   }
   if (mensaje.includes("same password")) {
     return "La nueva contraseña debe ser diferente a la anterior.";
