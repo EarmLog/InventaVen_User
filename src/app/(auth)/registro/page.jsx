@@ -58,14 +58,18 @@ export default function PaginaRegistro() {
 
     setCargando(true);
     try {
-      await registrarUsuario({
+      const datos = await registrarUsuario({
         correo: formulario.correo,
         contrasena: formulario.contrasena,
         nombreNegocio: formulario.nombreNegocio.trim(),
         telefono: formulario.telefono.trim(),
       });
-      toast.success("¡Tu cuenta y negocio fueron creados con éxito! Ya puedes iniciar sesión.");
-      router.replace("/login");
+      if (datos?.session) {
+        toast.success("Tu negocio fue creado. Tienes 30 días gratis.");
+        router.replace("/panel");
+      } else {
+        router.replace("/registro/confirmar");
+      }
     } catch (err) {
       setError(err.message);
       toast.error(err.message);
