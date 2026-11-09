@@ -122,7 +122,7 @@ export function ProveedorSesion({ children }) {
             telefono: telefono || "",
             onboardingVisto: false,
           },
-          emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel`,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?destino=/panel`,
         },
       });
       if (error) throw new Error(traducirErrorAuth(error));
@@ -140,7 +140,7 @@ export function ProveedorSesion({ children }) {
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: String(correo || "").trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel` },
+      options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?destino=/panel` },
     });
     if (error) throw new Error(traducirErrorAuth(error));
     return true;
