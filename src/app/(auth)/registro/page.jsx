@@ -38,7 +38,6 @@ export default function PaginaRegistro() {
   async function enviar(evento) {
     evento.preventDefault();
     setError("");
-    setMensaje("");
     if (!formulario.nombreNegocio.trim()) {
       setError("Escribe el nombre de tu negocio.");
       return;
