@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Confirma tu correo electrónico - InventaVen</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f4f6f5; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <h1 style="color: #062e24; margin: 0; font-size: 24px;">InventaVen</h1>
+      <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;">Inventario · POS · Análisis</p>
+    </div>
+    <h2 style="color: #111827; font-size: 20px; margin-top: 0;">¡Bienvenido a InventaVen!</h2>
+    <p style="color: #374151; font-size: 14px; line-height: 1.6;">
+      Has registrado exitosamente tu negocio en InventaVen. Para comenzar tus 30 días gratis y asegurar el acceso a tu panel de control, por favor confirma tu dirección de correo electrónico haciendo clic en el siguiente botón:
+    </p>
+    <div style="text-align: center; margin: 32px 0;">
+      <a href="{{ .ConfirmationURL }}" target="_blank" style="background-color: #059669; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">Confirmar mi correo electrónico</a>
+    </div>
+    <p style="color: #6b7280; font-size: 12px; line-height: 1.5;">
+      Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:<br>
+      <a href="{{ .ConfirmationURL }}" style="color: #059669; word-break: break-all;">{{ .ConfirmationURL }}</a>
+    </p>
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+    <p style="color: #9ca3af; font-size: 11px; text-align: center; margin: 0;">
+      Si no creaste esta cuenta, puedes ignorar este mensaje con total seguridad.
+    </p>
+  </div>
+</body>
+</html>
