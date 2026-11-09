@@ -111,26 +111,16 @@ export function ProveedorSesion({ children }) {
 
   const registrarUsuario = useCallback(
     async ({ correo, contrasena, nombreNegocio, telefono }) => {
-      const supabase = obtenerClienteSupabase();
-      const { data, error } = await supabase.auth.signUp({
-        email: correo.trim().toLowerCase(),
-        password: contrasena,
-        options: {
-          data: {
-            nombre_negocio: nombreNegocio,
-            nombre: nombreNegocio,
-            telefono: telefono || "",
-            onboardingVisto: false,
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback?destino=/panel`,
-        },
+      const respuesta = await fetch("/api/auth/registro", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ correo, contrasena, nombreNegocio, telefono }),
       });
-      if (error) throw new Error(traducirErrorAuth(error));
-      if (data.session) {
-        await supabase.auth.signOut();
-        return { user: data.user, session: null };
+      const datos = await respuesta.json().catch(() => ({}));
+      if (!respuesta.ok) {
+        throw new Error(datos.error || "No se pudo registrar la cuenta.");
       }
-      return data;
+      return datos;
     },
     []
   );
