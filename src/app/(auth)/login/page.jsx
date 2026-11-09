@@ -31,6 +31,13 @@ export default function PaginaLogin() {
     if (sesion) router.replace("/panel");
   }, [sesion, router]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmado") === "1") {
+      toast.success("¡Correo confirmado con éxito! Ya puedes iniciar sesión.");
+    }
+  }, []);
+
   async function realizarLogin(ticketUsar) {
     const ticket = ticketUsar || captchaTicket;
     if (!ticket) return;

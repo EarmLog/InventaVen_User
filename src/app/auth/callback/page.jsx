@@ -24,14 +24,12 @@ export default function PaginaAuthCallback() {
           const { error: errorCodigo } = await supabase.auth.exchangeCodeForSession(codigo);
           if (errorCodigo) throw errorCodigo;
         }
-        const { data } = await supabase.auth.getSession();
+        // Confirmación exitosa: cerramos sesión y mandamos al login
+        await supabase.auth.signOut().catch(() => {});
         if (!activo) return;
-        if (data.session) {
-          setListo(true);
-          router.replace("/panel");
-          return;
-        }
-        router.replace("/login");
+        setListo(true);
+        router.replace("/login?confirmado=1");
+        return;
       } catch {
         if (activo) {
           setError("No se pudo completar el inicio de sesión. Solicita un nuevo enlace.");
