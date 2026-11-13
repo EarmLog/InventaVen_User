@@ -23,13 +23,28 @@ import Tarjeta from "@/components/ui/Tarjeta";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
+import Selector from "@/components/ui/Selector";
 import Etiqueta from "@/components/ui/Etiqueta";
 import Interruptor from "@/components/ui/Interruptor";
 import Modal from "@/components/ui/Modal";
 import Alerta from "@/components/ui/Alerta";
 import { descargarRespaldo, restaurarRespaldo } from "@/lib/db/respaldo";
 import { actualizarPreciosPorTasa, guardarAjuste } from "@/lib/db/repositorios";
-import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
+import { validarContrasena } from "@/lib/seguridad/contrasena";
+import {
+  componerNombreNegocio,
+  limpiarRif,
+  limpiarTelefono,
+  separarNombreSufijo,
+  validarNombreCuenta,
+  validarRifVe,
+  validarTelefonoVe,
+} from "@/lib/seguridad/validaciones";
+import {
+  CLAVES_AJUSTES,
+  SUFIJOS_LEGALES_VE,
+  TIPOS_CUENTA,
+} from "@/lib/utilidades/constantes";
 import { formatearFechaHora, formatearNumero, formatearVes } from "@/lib/utilidades/formato";
 
 export default function PaginaConfiguracion() {
@@ -39,6 +54,9 @@ export default function PaginaConfiguracion() {
   const { tema, cambiarTema } = useTema();
 
   const [nombreNegocio, setNombreNegocio] = useState("");
+  const [tipoCuenta, setTipoCuenta] = useState("personal");
+  const [negocioRegistrado, setNegocioRegistrado] = useState(false);
+  const [sufijoLegal, setSufijoLegal] = useState("");
   const [telefono, setTelefono] = useState("");
   const [rif, setRif] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
@@ -77,20 +95,74 @@ export default function PaginaConfiguracion() {
   const sincronizacionNube = Boolean(ajustes[CLAVES_AJUSTES.SINC_NUBE]);
 
   useEffect(() => {
-    setNombreNegocio(perfil?.nombreNegocio || "");
+    const { nombre, sufijo } = separarNombreSufijo(perfil?.nombreNegocio || "");
+    setNombreNegocio(nombre);
+    setTipoCuenta(perfil?.tipoCuenta || "personal");
+    setNegocioRegistrado(
+      Boolean(perfil?.negocioRegistrado) || Boolean(sufijo) || Boolean(perfil?.rif)
+    );
+    setSufijoLegal(perfil?.sufijoLegal || sufijo || "");
     setTelefono(perfil?.telefono || "");
     setRif(perfil?.rif || ajustes[CLAVES_AJUSTES.RIF_NEGOCIO] || "");
   }, [perfil, ajustes]);
 
+  function cambiarTipoCuenta(valor) {
+    setTipoCuenta(valor);
+    if (valor === "personal") {
+      setNegocioRegistrado(false);
+      setSufijoLegal("");
+      setRif("");
+    } else if (valor === "empresa") {
+      setNegocioRegistrado(true);
+    }
+  }
+
+  function cambiarRegistroNegocio(valor) {
+    setNegocioRegistrado(valor);
+    if (!valor) setSufijoLegal("");
+  }
+
   async function guardarNegocio() {
-    if (!nombreNegocio.trim()) {
-      toast.error("El nombre del negocio es obligatorio.");
+    const errorNombre = validarNombreCuenta(nombreNegocio);
+    if (errorNombre) {
+      toast.error(errorNombre);
       return;
     }
+    if (tipoCuenta !== "personal" && negocioRegistrado && !sufijoLegal) {
+      toast.error("Selecciona el sufijo legal de tu negocio.");
+      return;
+    }
+    const errorTelefono = validarTelefonoVe(telefono);
+    if (errorTelefono) {
+      toast.error(errorTelefono);
+      return;
+    }
+    const errorRif = validarRifVe(rif, {
+      obligatorio: false,
+    });
+    if (errorRif) {
+      toast.error(errorRif);
+      return;
+    }
+
     setGuardandoPerfil(true);
     try {
-      await actualizarPerfil({ nombreNegocio, telefono, rif });
+      const actualizado = await actualizarPerfil({
+        nombreNegocio,
+        telefono,
+        rif,
+        tipoCuenta,
+        negocioRegistrado,
+        sufijoLegal,
+      });
+      await guardarAjuste(
+        CLAVES_AJUSTES.NOMBRE_NEGOCIO,
+        componerNombreNegocio(nombreNegocio, sufijoLegal)
+      );
       await guardarAjuste(CLAVES_AJUSTES.RIF_NEGOCIO, rif);
+      setNombreNegocio(
+        separarNombreSufijo(actualizado?.nombreNegocio || nombreNegocio).nombre
+      );
       toast.success("Datos del negocio actualizados.");
     } catch (error) {
       toast.error(error.message);
@@ -141,8 +213,9 @@ export default function PaginaConfiguracion() {
   }
 
   async function cambiarContrasena() {
-    if (nuevaClave.length < 8) {
-      toast.error("La nueva contraseña debe tener al menos 8 caracteres.");
+    const errorClave = validarContrasena(nuevaClave);
+    if (errorClave) {
+      toast.error(errorClave);
       return;
     }
     if (nuevaClave !== confirmarClave) {
@@ -234,27 +307,93 @@ export default function PaginaConfiguracion() {
             </div>
           </div>
           <div className="space-y-3">
-            <Campo etiqueta="Nombre del negocio" requerido>
+            <Campo
+              etiqueta="Tipo de cuenta"
+              ayuda={
+                TIPOS_CUENTA.find((tipo) => tipo.valor === tipoCuenta)?.descripcion
+              }
+            >
+              <Selector
+                value={tipoCuenta}
+                onChange={(evento) => cambiarTipoCuenta(evento.target.value)}
+              >
+                {TIPOS_CUENTA.map((tipo) => (
+                  <option key={tipo.valor} value={tipo.valor}>
+                    {tipo.etiqueta}
+                  </option>
+                ))}
+              </Selector>
+            </Campo>
+            <Campo
+              etiqueta={
+                tipoCuenta === "personal"
+                  ? "Nombre de la cuenta"
+                  : "Nombre del negocio"
+              }
+              requerido
+            >
               <Entrada
                 value={nombreNegocio}
                 onChange={(evento) => setNombreNegocio(evento.target.value)}
                 maxLength={160}
               />
             </Campo>
-            <Campo etiqueta="Teléfono">
+            {tipoCuenta !== "personal" ? (
+              <div className="space-y-3 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] p-3">
+                <Interruptor
+                  activo={negocioRegistrado}
+                  onCambio={cambiarRegistroNegocio}
+                  disabled={tipoCuenta === "empresa"}
+                  etiqueta="Negocio registrado legalmente"
+                  descripcion={
+                    tipoCuenta === "empresa"
+                      ? "Las empresas siempre deben indicar su sufijo legal."
+                      : "Actívalo para usar un sufijo legal en tus facturas."
+                  }
+                />
+                {negocioRegistrado ? (
+                  <Campo etiqueta="Sufijo legal" requerido>
+                    <Selector
+                      value={sufijoLegal}
+                      onChange={(evento) => setSufijoLegal(evento.target.value)}
+                    >
+                      <option value="">Selecciona el sufijo</option>
+                      {SUFIJOS_LEGALES_VE.map((sufijo) => (
+                        <option key={sufijo.valor} value={sufijo.valor}>
+                          {sufijo.etiqueta}
+                        </option>
+                      ))}
+                    </Selector>
+                  </Campo>
+                ) : null}
+                <Campo
+                  etiqueta="RIF del negocio (opcional)"
+                  ayuda="Formato venezolano, por ejemplo J-12345678-9."
+                >
+                  <Entrada
+                    value={rif}
+                    onChange={(evento) =>
+                      setRif(limpiarRif(evento.target.value))
+                    }
+                    maxLength={12}
+                    placeholder="J-12345678-9"
+                    className="font-mono uppercase"
+                  />
+                </Campo>
+              </div>
+            ) : null}
+            <Campo
+              etiqueta="Teléfono"
+              ayuda="Solo números, sin espacios ni guiones."
+            >
               <Entrada
                 value={telefono}
-                onChange={(evento) => setTelefono(evento.target.value)}
-                maxLength={40}
-                placeholder="0412-0000000"
-              />
-            </Campo>
-            <Campo etiqueta="RIF del negocio">
-              <Entrada
-                value={rif}
-                onChange={(evento) => setRif(evento.target.value)}
-                maxLength={20}
-                placeholder="J-12345678-9"
+                onChange={(evento) =>
+                  setTelefono(limpiarTelefono(evento.target.value))
+                }
+                maxLength={13}
+                inputMode="numeric"
+                placeholder="04121234567"
               />
             </Campo>
             <div className="flex items-center justify-between rounded-xl bg-[var(--superficie-2)] px-3 py-2 text-[11px]">

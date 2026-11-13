@@ -139,6 +139,16 @@ export function normalizarTextoSku(texto) {
     .toUpperCase();
 }
 
+export function resumenVariantes(entidad, maximo = 3) {
+  const nombres = (entidad?.variantes || [])
+    .map((variante) => String(variante?.nombre || "").trim())
+    .filter(Boolean);
+  if (!nombres.length) return "";
+  const visibles = nombres.slice(0, maximo);
+  const restantes = nombres.length - visibles.length;
+  return `${visibles.join(" · ")}${restantes > 0 ? ` · +${restantes}` : ""}`;
+}
+
 export function capitalizar(texto) {
   const cadena = String(texto || "").trim();
   if (!cadena) return "";

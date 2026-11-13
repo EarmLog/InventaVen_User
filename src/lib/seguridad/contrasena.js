@@ -8,5 +8,8 @@ export function validarContrasena(clave) {
   if (!/[0-9]/.test(clave)) {
     return "La contraseña debe incluir al menos un número.";
   }
+  if (/\s/.test(clave)) {
+    return "La contraseña no puede contener espacios.";
+  }
   return "";
 }

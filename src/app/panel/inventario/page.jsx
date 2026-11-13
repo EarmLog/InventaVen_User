@@ -41,6 +41,7 @@ import {
   formatearUsd,
   formatearVes,
   redondear,
+  resumenVariantes,
 } from "@/lib/utilidades/formato";
 
 function Miniatura({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
@@ -341,6 +342,11 @@ export default function PaginaInventario() {
                                   ? ` · ${producto.variantes.length} variantes`
                                   : ""}
                               </p>
+                              {producto.variantes?.length ? (
+                                <p className="max-w-[260px] truncate text-[10px] text-[var(--texto-suave)]">
+                                  {resumenVariantes(producto)}
+                                </p>
+                              ) : null}
                             </div>
                           </div>
                         </td>
@@ -463,6 +469,11 @@ export default function PaginaInventario() {
                       <p className="font-mono text-[10px] text-[var(--texto-suave)]">
                         {producto.sku}
                       </p>
+                      {producto.variantes?.length ? (
+                        <p className="mt-0.5 truncate text-[10px] text-[var(--texto-suave)]">
+                          {resumenVariantes(producto)}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex gap-1">
                       <Boton

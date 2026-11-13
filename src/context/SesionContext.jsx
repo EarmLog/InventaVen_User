@@ -10,27 +10,34 @@ import {
 } from "react";
 import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
 import { solicitarPerfil, traducirErrorAuth } from "@/lib/api/auth";
+import { componerNombreNegocio } from "@/lib/seguridad/validaciones";
 
 const SesionContext = createContext(null);
 
 export function ProveedorSesion({ children }) {
   const [sesion, setSesion] = useState(undefined);
   const [perfil, setPerfil] = useState(null);
-  const [cargandoPerfil, setCargandoPerfil] = useState(false);
+  const [cargandoPerfil, setCargandoPerfil] = useState(true);
   const [onboardingAbierto, setOnboardingAbierto] = useState(false);
   const montado = useRef(true);
   const perfilEnCurso = useRef(false);
+  const perfilRef = useRef(null);
 
   const cargarPerfil = useCallback(async (sesionActual) => {
     if (!sesionActual?.access_token) {
-      if (montado.current) setPerfil(null);
+      perfilRef.current = null;
+      if (montado.current) {
+        setPerfil(null);
+        setCargandoPerfil(false);
+      }
       return null;
     }
     if (perfilEnCurso.current) return null;
     perfilEnCurso.current = true;
-    if (montado.current) setCargandoPerfil(true);
+    if (montado.current && !perfilRef.current) setCargandoPerfil(true);
     try {
       const datos = await solicitarPerfil(sesionActual.access_token);
+      perfilRef.current = datos;
       if (montado.current) setPerfil(datos);
       return datos;
     } catch (error) {
@@ -53,10 +60,20 @@ export function ProveedorSesion({ children }) {
       .then(({ data }) => {
         if (!montado.current) return;
         setSesion(data.session ?? null);
-        if (data.session) cargarPerfil(data.session);
+        if (data.session) {
+          cargarPerfil(data.session);
+        } else {
+          perfilRef.current = null;
+          setPerfil(null);
+          setCargandoPerfil(false);
+        }
       })
       .catch(() => {
-        if (montado.current) setSesion(null);
+        if (!montado.current) return;
+        perfilRef.current = null;
+        setSesion(null);
+        setPerfil(null);
+        setCargandoPerfil(false);
       });
 
     const { data: escucha } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {
@@ -65,7 +82,9 @@ export function ProveedorSesion({ children }) {
       if (nuevaSesion) {
         if (evento !== "TOKEN_REFRESHED") cargarPerfil(nuevaSesion);
       } else {
+        perfilRef.current = null;
         setPerfil(null);
+        setCargandoPerfil(false);
       }
     });
 
@@ -110,16 +129,30 @@ export function ProveedorSesion({ children }) {
   }, []);
 
   const registrarUsuario = useCallback(
-    async ({ correo, contrasena, nombreNegocio, telefono }) => {
+    async ({
+      correo,
+      contrasena,
+      nombreNegocio,
+      telefono,
+      tipoCuenta,
+      negocioRegistrado,
+      sufijoLegal,
+      rif,
+    }) => {
       const supabase = obtenerClienteSupabase();
+      const nombreCompleto = componerNombreNegocio(nombreNegocio, sufijoLegal);
       const { data, error } = await supabase.auth.signUp({
         email: correo.trim().toLowerCase(),
         password: contrasena,
         options: {
           data: {
-            nombre_negocio: nombreNegocio,
-            nombre: nombreNegocio,
+            nombre_negocio: nombreCompleto,
+            nombre: nombreCompleto,
             telefono: telefono || "",
+            tipo_cuenta: tipoCuenta || "personal",
+            negocio_registrado: Boolean(negocioRegistrado),
+            sufijo_legal: sufijoLegal || "",
+            rif: rif || "",
             onboardingVisto: false,
           },
           emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback?destino=/panel`,
@@ -158,8 +191,10 @@ export function ProveedorSesion({ children }) {
   const cerrarSesion = useCallback(async () => {
     const supabase = obtenerClienteSupabase();
     await supabase.auth.signOut();
+    perfilRef.current = null;
     setPerfil(null);
     setSesion(null);
+    setCargandoPerfil(false);
   }, []);
 
   const recuperarClave = useCallback(async (correo) => {
@@ -189,6 +224,7 @@ export function ProveedorSesion({ children }) {
         "PATCH",
         datos
       );
+      perfilRef.current = actualizado;
       setPerfil(actualizado);
       return actualizado;
     },

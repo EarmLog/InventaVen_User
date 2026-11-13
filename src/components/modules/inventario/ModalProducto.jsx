@@ -20,6 +20,7 @@ import {
   CATEGORIAS_SUGERIDAS,
   SECUENCIAS,
   MONEDAS,
+  sugerenciasParaCategoria,
 } from "@/lib/utilidades/constantes";
 import { baseSku, numeracionCorrelativa } from "@/lib/utilidades/sku";
 import {
@@ -141,6 +142,10 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
       ),
     [formulario.variantes]
   );
+  const sugerencias = useMemo(
+    () => sugerenciasParaCategoria(formulario.categoria),
+    [formulario.categoria]
+  );
 
   function agregarVariante() {
     setFormulario((anterior) => ({
@@ -148,7 +153,13 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
       conVariantes: true,
       variantes: [
         ...anterior.variantes,
-        { id: null, nombre: "", stock: "0", precioVes: "", activo: true },
+        {
+          id: null,
+          nombre: sugerencias[0] || "",
+          stock: "0",
+          precioVes: "",
+          activo: true,
+        },
       ],
     }));
   }
@@ -567,19 +578,55 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
 
           {formulario.conVariantes ? (
             <div className="mt-4 space-y-2">
+              <p className="text-[10px] text-[var(--texto-tenue)]">
+                Elige una sugerencia según la categoría o crea una variante
+                personalizada.
+              </p>
               {formulario.variantes.map((variante, indice) => (
                 <div
                   key={variante.id || `nueva-${indice}`}
                   className="grid gap-2 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] p-3 sm:grid-cols-[1.3fr_0.7fr_0.8fr_auto]"
                 >
-                  <Entrada
-                    value={variante.nombre}
-                    onChange={(evento) =>
-                      actualizarVariante(indice, "nombre", evento.target.value)
-                    }
-                    placeholder="Variante (ej. Rojo / Talla M)"
-                    maxLength={120}
-                  />
+                  <div className="space-y-1.5">
+                    <Selector
+                      value={
+                        sugerencias.includes(variante.nombre)
+                          ? variante.nombre
+                          : "__otro__"
+                      }
+                      onChange={(evento) => {
+                        const valor = evento.target.value;
+                        actualizarVariante(
+                          indice,
+                          "nombre",
+                          valor === "__otro__" ? "" : valor
+                        );
+                      }}
+                    >
+                      <optgroup label="Sugerencias">
+                        {sugerencias.map((sugerencia) => (
+                          <option key={sugerencia} value={sugerencia}>
+                            {sugerencia}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="__otro__">Otro (personalizado)</option>
+                    </Selector>
+                    {!sugerencias.includes(variante.nombre) ? (
+                      <Entrada
+                        value={variante.nombre}
+                        onChange={(evento) =>
+                          actualizarVariante(
+                            indice,
+                            "nombre",
+                            evento.target.value
+                          )
+                        }
+                        placeholder="Escribe la variante personalizada"
+                        maxLength={120}
+                      />
+                    ) : null}
+                  </div>
                   <Entrada
                     type="number"
                     min="0"

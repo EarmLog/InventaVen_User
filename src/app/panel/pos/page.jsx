@@ -41,6 +41,7 @@ import {
   formatearUsd,
   formatearVes,
   redondear,
+  resumenVariantes,
 } from "@/lib/utilidades/formato";
 import { buscarPorCodigo } from "@/lib/utilidades/codigos";
 
@@ -411,6 +412,11 @@ export default function PaginaPOS() {
                         <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--texto-tenue)]">
                           {producto.sku}
                         </p>
+                        {producto.variantes?.length ? (
+                          <p className="mt-0.5 truncate text-[10px] text-[var(--texto-suave)]">
+                            {resumenVariantes(producto)}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primario-suave)] text-[var(--primario-fuerte)] transition group-hover:bg-[var(--primario)] group-hover:text-white">
                         <ShoppingCart className="h-4 w-4" />

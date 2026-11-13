@@ -42,6 +42,84 @@ export const CATEGORIAS_SUGERIDAS = [
   "Otros",
 ];
 
+export const TIPOS_CUENTA = [
+  {
+    valor: "personal",
+    etiqueta: "Personal",
+    descripcion: "Uso personal, sin datos fiscales.",
+  },
+  {
+    valor: "micronegocio",
+    etiqueta: "Micro negocio",
+    descripcion: "Emprendimiento, venta informal o desde casa.",
+  },
+  {
+    valor: "negocio",
+    etiqueta: "Negocio / Mercado",
+    descripcion: "Local, mercado, abasto o negocio establecido.",
+  },
+  {
+    valor: "empresa",
+    etiqueta: "Empresa",
+    descripcion: "Empresa constituida legalmente en Venezuela.",
+  },
+];
+
+export const SUFIJOS_LEGALES_VE = [
+  { valor: "C.A.", etiqueta: "C.A. — Compañía Anónima" },
+  { valor: "S.A.", etiqueta: "S.A. — Sociedad Anónima" },
+  {
+    valor: "S.R.L.",
+    etiqueta: "S.R.L. — Sociedad de Responsabilidad Limitada",
+  },
+  { valor: "C.A.S.A.", etiqueta: "C.A.S.A. — Compañía Anónima S.A." },
+  { valor: "S.C.", etiqueta: "S.C. — Sociedad Civil" },
+  { valor: "Cooperativa", etiqueta: "Cooperativa" },
+];
+
+export const SUGERENCIAS_VARIANTES = {
+  Alimentos: [
+    "Tamaño personal",
+    "Tamaño familiar",
+    "Paquete",
+    "Caja",
+    "Unidad",
+    "Granel",
+  ],
+  Bebidas: [
+    "Lata",
+    "Botella 350 ml",
+    "Botella 1 L",
+    "Botella 2 L",
+    "Pack",
+    "Caja",
+  ],
+  Limpieza: ["Pequeño", "Mediano", "Grande", "Galón", "Pack", "Recarga"],
+  "Cuidado personal": [
+    "Pequeño",
+    "Mediano",
+    "Grande",
+    "Pack",
+    "Recarga",
+    "Unidad",
+  ],
+  Papelería: ["Unidad", "Paquete", "Caja", "Resma", "Bloc"],
+  Ferretería: ["Unidad", "Metro", "Kilo", "Caja", "Paquete"],
+  Ropa: ["Talla S", "Talla M", "Talla L", "Talla XL", "Color", "Pack"],
+  Tecnología: [
+    "Modelo básico",
+    "Modelo estándar",
+    "Modelo premium",
+    "Color",
+    "Capacidad",
+  ],
+  Otros: ["Pequeño", "Mediano", "Grande", "Unidad", "Pack"],
+};
+
+export function sugerenciasParaCategoria(categoria) {
+  return SUGERENCIAS_VARIANTES[categoria] || SUGERENCIAS_VARIANTES.Otros;
+}
+
 export const CLAVES_AJUSTES = {
   TEMA: "tema",
   ACTUALIZAR_PRECIOS_AUTO: "actualizarPreciosAuto",

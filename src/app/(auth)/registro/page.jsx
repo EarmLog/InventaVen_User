@@ -8,17 +8,36 @@ import { toast } from "sonner";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
+import Selector from "@/components/ui/Selector";
+import Interruptor from "@/components/ui/Interruptor";
 import Alerta from "@/components/ui/Alerta";
 import { useSesion } from "@/context/SesionContext";
 import { validarContrasena } from "@/lib/seguridad/contrasena";
+import {
+  limpiarRif,
+  limpiarTelefono,
+  sinEspacios,
+  validarCorreo,
+  validarNombreCuenta,
+  validarRifVe,
+  validarTelefonoVe,
+} from "@/lib/seguridad/validaciones";
+import {
+  SUFIJOS_LEGALES_VE,
+  TIPOS_CUENTA,
+} from "@/lib/utilidades/constantes";
 
 export default function PaginaRegistro() {
   const { sesion, registrarUsuario } = useSesion();
   const router = useRouter();
   const [formulario, setFormulario] = useState({
+    tipoCuenta: "micronegocio",
     nombreNegocio: "",
+    negocioRegistrado: false,
+    sufijoLegal: "",
     correo: "",
     telefono: "",
+    rif: "",
     contrasena: "",
     confirmar: "",
   });
@@ -34,16 +53,58 @@ export default function PaginaRegistro() {
     setFormulario((anterior) => ({ ...anterior, [campo]: valor }));
   }
 
+  function cambiarTipoCuenta(valor) {
+    setFormulario((anterior) => ({
+      ...anterior,
+      tipoCuenta: valor,
+      negocioRegistrado:
+        valor === "empresa" ? true : valor === "personal" ? false : anterior.negocioRegistrado,
+      sufijoLegal: valor === "personal" ? "" : anterior.sufijoLegal,
+      rif: valor === "personal" ? "" : anterior.rif,
+    }));
+  }
+
+  function cambiarRegistroNegocio(valor) {
+    setFormulario((anterior) => ({
+      ...anterior,
+      negocioRegistrado: valor,
+      sufijoLegal: valor ? anterior.sufijoLegal : "",
+      rif: valor ? anterior.rif : "",
+    }));
+  }
+
+  const tipoSeleccionado = TIPOS_CUENTA.find(
+    (tipo) => tipo.valor === formulario.tipoCuenta
+  );
+  const mostrarDatosFiscales =
+    formulario.tipoCuenta !== "personal" && formulario.negocioRegistrado;
 
   async function enviar(evento) {
     evento.preventDefault();
     setError("");
-    if (!formulario.nombreNegocio.trim()) {
-      setError("Escribe el nombre de tu negocio.");
+
+    const errorNombre = validarNombreCuenta(formulario.nombreNegocio);
+    if (errorNombre) {
+      setError(errorNombre);
       return;
     }
-    if (!formulario.correo.trim()) {
-      setError("Escribe un correo electrónico.");
+    if (mostrarDatosFiscales && !formulario.sufijoLegal) {
+      setError("Selecciona el sufijo legal de tu negocio.");
+      return;
+    }
+    const errorCorreo = validarCorreo(formulario.correo);
+    if (errorCorreo) {
+      setError(errorCorreo);
+      return;
+    }
+    const errorTelefono = validarTelefonoVe(formulario.telefono);
+    if (errorTelefono) {
+      setError(errorTelefono);
+      return;
+    }
+    const errorRif = validarRifVe(formulario.rif, { obligatorio: false });
+    if (errorRif) {
+      setError(errorRif);
       return;
     }
     const errorClave = validarContrasena(formulario.contrasena);
@@ -62,7 +123,11 @@ export default function PaginaRegistro() {
         correo: formulario.correo,
         contrasena: formulario.contrasena,
         nombreNegocio: formulario.nombreNegocio.trim(),
-        telefono: formulario.telefono.trim(),
+        telefono: formulario.telefono,
+        tipoCuenta: formulario.tipoCuenta,
+        negocioRegistrado: formulario.negocioRegistrado,
+        sufijoLegal: mostrarDatosFiscales ? formulario.sufijoLegal : "",
+        rif: mostrarDatosFiscales ? formulario.rif : "",
       });
       if (datos?.session) {
         toast.success("Tu negocio fue creado. Tienes 30 días gratis.");
@@ -90,24 +155,97 @@ export default function PaginaRegistro() {
       <form onSubmit={enviar} className="mt-7 space-y-4">
         {error ? <Alerta tipo="error">{error}</Alerta> : null}
 
-        <Campo etiqueta="Nombre del negocio" requerido>
+        <Campo
+          etiqueta="Tipo de cuenta"
+          requerido
+          ayuda={tipoSeleccionado?.descripcion}
+        >
+          <Selector
+            value={formulario.tipoCuenta}
+            onChange={(evento) => cambiarTipoCuenta(evento.target.value)}
+          >
+            {TIPOS_CUENTA.map((tipo) => (
+              <option key={tipo.valor} value={tipo.valor}>
+                {tipo.etiqueta}
+              </option>
+            ))}
+          </Selector>
+        </Campo>
+
+        <Campo
+          etiqueta={
+            formulario.tipoCuenta === "personal"
+              ? "Nombre de la cuenta"
+              : "Nombre del negocio"
+          }
+          requerido
+        >
           <div className="relative">
             <Entrada
               value={formulario.nombreNegocio}
               onChange={(evento) => cambiar("nombreNegocio", evento.target.value)}
-              placeholder="Ej. Abastos La Esquina"
+              placeholder={
+                formulario.tipoCuenta === "personal"
+                  ? "Ej. María Pérez"
+                  : "Ej. Abastos La Esquina"
+              }
               maxLength={160}
               required
             />
           </div>
         </Campo>
 
+        {formulario.tipoCuenta !== "personal" ? (
+          <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-4">
+            <Interruptor
+              activo={formulario.negocioRegistrado}
+              onCambio={cambiarRegistroNegocio}
+              disabled={formulario.tipoCuenta === "empresa"}
+              etiqueta="Mi negocio está registrado legalmente"
+              descripcion={
+                formulario.tipoCuenta === "empresa"
+                  ? "Las empresas siempre deben indicar su sufijo legal."
+                  : "Actívalo si tienes RIF y deseas mostrar el sufijo legal en tus facturas."
+              }
+            />
+            {mostrarDatosFiscales ? (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Campo etiqueta="Sufijo legal" requerido>
+                  <Selector
+                    value={formulario.sufijoLegal}
+                    onChange={(evento) => cambiar("sufijoLegal", evento.target.value)}
+                  >
+                    <option value="">Selecciona el sufijo</option>
+                    {SUFIJOS_LEGALES_VE.map((sufijo) => (
+                      <option key={sufijo.valor} value={sufijo.valor}>
+                        {sufijo.etiqueta}
+                      </option>
+                    ))}
+                  </Selector>
+                </Campo>
+                <Campo
+                  etiqueta="RIF del negocio (opcional)"
+                  ayuda="Formato venezolano, por ejemplo J-12345678-9."
+                >
+                  <Entrada
+                    value={formulario.rif}
+                    onChange={(evento) => cambiar("rif", limpiarRif(evento.target.value))}
+                    placeholder="J-12345678-9"
+                    maxLength={12}
+                    className="font-mono uppercase"
+                  />
+                </Campo>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         <Campo etiqueta="Correo electrónico" requerido>
           <div className="relative">
             <Entrada
               type="email"
               value={formulario.correo}
-              onChange={(evento) => cambiar("correo", evento.target.value)}
+              onChange={(evento) => cambiar("correo", sinEspacios(evento.target.value))}
               placeholder="tu@negocio.com"
               autoComplete="email"
               autoCapitalize="none"
@@ -118,13 +256,19 @@ export default function PaginaRegistro() {
           </div>
         </Campo>
 
-        <Campo etiqueta="Teléfono (opcional)">
+        <Campo
+          etiqueta="Teléfono (opcional)"
+          ayuda="Solo números, sin espacios ni guiones."
+        >
           <div className="relative">
             <Entrada
               value={formulario.telefono}
-              onChange={(evento) => cambiar("telefono", evento.target.value)}
-              placeholder="+58 412 000 0000"
-              maxLength={40}
+              onChange={(evento) =>
+                cambiar("telefono", limpiarTelefono(evento.target.value))
+              }
+              placeholder="04121234567"
+              maxLength={13}
+              inputMode="numeric"
               autoComplete="tel"
             />
           </div>
@@ -137,7 +281,7 @@ export default function PaginaRegistro() {
                 type={verClave ? "text" : "password"}
                 value={formulario.contrasena}
                 onChange={(evento) => cambiar("contrasena", evento.target.value)}
-                placeholder="Mínimo 8 caracteres, con letra y número"
+                placeholder="Mínimo 8 caracteres, sin espacios"
                 className="pr-9"
                 autoComplete="new-password"
                 maxLength={200}
