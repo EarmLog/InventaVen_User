@@ -660,7 +660,7 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
             </div>
           </div>
           <p className="mt-2 text-[11px] text-[var(--texto-tenue)]">
-            La foto se comprime antes de guardarse y se usa en la tienda virtual.
+            La foto se comprime antes de guardarse y se usa en la tienda online.
           </p>
           <input
             ref={entradaCamara}
@@ -889,8 +889,8 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
           <Interruptor
             activo={formulario.visibleTienda}
             onCambio={(valor) => cambiar("visibleTienda", valor)}
-            etiqueta="Mostrar en tienda virtual"
-            descripcion="Permite que este producto sea visible en la tienda virtual."
+            etiqueta="Mostrar en tienda online"
+            descripcion="Permite que este producto sea visible en la tienda online."
           />
         </div>
       </form>

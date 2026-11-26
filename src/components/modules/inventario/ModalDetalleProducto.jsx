@@ -81,7 +81,7 @@ export default function ModalDetalleProducto({
             {producto.activo === false ? "Inactivo" : "Activo"}
           </Etiqueta>
           <Etiqueta variante={producto.visibleTienda ? "exito" : "neutra"}>
-            {producto.visibleTienda ? "Visible en tienda virtual" : "No visible"}
+            {producto.visibleTienda ? "Visible en tienda online" : "No visible"}
           </Etiqueta>
           {producto.ofertaActiva ? (
             <Etiqueta variante="advertencia">

@@ -27,7 +27,7 @@ const TITULOS = {
   "/panel/deudores": "Deudores y cobranzas",
   "/panel/analisis": "Análisis de ventas",
   "/panel/fiscal": "Facturación y fiscalidad",
-  "/panel/proveedores": "Proveedores",
+  "/panel/tienda": "Tienda online",
   "/panel/auditoria": "Auditoría",
   "/panel/pendientes": "Ventas pendientes",
   "/panel/configuracion": "Configuración",
