@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Camera, Plus, QrCode, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Camera, ImagePlus, Plus, QrCode, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
@@ -13,7 +13,13 @@ import Alerta from "@/components/ui/Alerta";
 import Etiqueta from "@/components/ui/Etiqueta";
 import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
 import ModalEmparejamientoQR from "@/components/ui/ModalEmparejamientoQR";
-import { guardarProducto } from "@/lib/db/repositorios";
+import {
+  guardarProducto,
+  guardarImagenProducto,
+  obtenerImagenProducto,
+  eliminarImagenProducto,
+} from "@/lib/db/repositorios";
+import { comprimirImagen } from "@/lib/utilidades/imagenes";
 import { db } from "@/lib/db/baseDatos";
 import { reproducirPitidoExito } from "@/lib/utilidades/audio";
 import {
@@ -53,6 +59,7 @@ function formularioDesdeProducto(producto) {
       stock: "0",
       stockMinimo: "0",
       activo: true,
+      visibleTienda: false,
       conVariantes: false,
       ofertaActiva: false,
       ofertaCantidad: "3",
@@ -75,6 +82,7 @@ function formularioDesdeProducto(producto) {
     stock: String(producto.stock || 0),
     stockMinimo: String(producto.stockMinimo || 0),
     activo: producto.activo !== false,
+    visibleTienda: Boolean(producto.visibleTienda),
     conVariantes: Boolean(producto.variantes?.length),
     ofertaActiva: Boolean(producto.ofertaActiva),
     ofertaCantidad: String(producto.ofertaCantidad || 3),
@@ -97,6 +105,12 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
   const [error, setError] = useState("");
   const [escanerAbierto, setEscanerAbierto] = useState(false);
   const [qrAbierto, setQrAbierto] = useState(false);
+  const [foto, setFoto] = useState(null);
+  const [fotoInfo, setFotoInfo] = useState(null);
+  const [fotoPendiente, setFotoPendiente] = useState(false);
+  const [procesandoFoto, setProcesandoFoto] = useState(false);
+  const entradaCamara = useRef(null);
+  const entradaGaleria = useRef(null);
 
   const esEdicion = Boolean(producto?.id);
   const tasaUsada = Number(tasa) || Number(producto?.tasaUsd) || 0;
@@ -105,7 +119,25 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
     if (!abierto) return;
     setFormulario(formularioDesdeProducto(producto));
     setError("");
-    if (!producto) {
+    setFoto(null);
+    setFotoInfo(null);
+    setFotoPendiente(false);
+    if (producto?.id) {
+      (async () => {
+        try {
+          const imagen = await obtenerImagenProducto(producto.id);
+          setFoto(imagen?.datos || null);
+          setFotoInfo(
+            imagen
+              ? { mime: imagen.mime, ancho: imagen.ancho, alto: imagen.alto }
+              : null
+          );
+        } catch (err) {
+          setError(err.message);
+          toast.error(err.message);
+        }
+      })();
+    } else {
       (async () => {
         const secuencia = db ? await db.secuencias.get(SECUENCIAS.PRODUCTOS) : null;
         setSiguienteNumero(Number(secuencia?.valor || 0) + 1);
@@ -185,6 +217,49 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
     cambiar("codigoBarra", limpio);
     reproducirPitidoExito();
     toast.success(`Código de barra capturado: ${limpio}`);
+  }
+
+  async function procesarFoto(evento) {
+    const archivo = evento.target.files?.[0];
+    if (!archivo) return;
+    setProcesandoFoto(true);
+    setError("");
+    try {
+      const comprimida = await comprimirImagen(archivo, {
+        ladoMaximo: 1200,
+        calidad: 0.78,
+      });
+      setFoto(comprimida.datos);
+      setFotoInfo({
+        mime: comprimida.mime,
+        ancho: comprimida.ancho,
+        alto: comprimida.alto,
+      });
+      setFotoPendiente(true);
+      toast.success("Foto procesada correctamente.");
+    } catch (err) {
+      setError(err.message);
+      toast.error(err.message);
+    } finally {
+      setProcesandoFoto(false);
+      evento.target.value = "";
+    }
+  }
+
+  async function quitarFoto() {
+    setError("");
+    try {
+      if (producto?.id) {
+        await eliminarImagenProducto(producto.id);
+      }
+      setFoto(null);
+      setFotoInfo(null);
+      setFotoPendiente(false);
+      toast.success("La foto del producto se quitó correctamente.");
+    } catch (err) {
+      setError(err.message);
+      toast.error(err.message);
+    }
   }
 
   async function guardar(evento) {
@@ -269,11 +344,21 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
         stock: formulario.conVariantes ? stockVariantes : limpiarNumero(formulario.stock, 0),
         stockMinimo: limpiarNumero(formulario.stockMinimo, 0),
         activo: formulario.activo,
+        visibleTienda: formulario.visibleTienda,
         ofertaActiva: formulario.ofertaActiva,
         ofertaCantidad: formulario.ofertaCantidad,
         ofertaDescuento: formulario.ofertaDescuento,
         variantes,
       });
+      if (foto && fotoPendiente && guardado?.id) {
+        await guardarImagenProducto({
+          productoId: guardado.id,
+          datos: foto,
+          mime: fotoInfo?.mime || "image/jpeg",
+          ancho: fotoInfo?.ancho || 0,
+          alto: fotoInfo?.alto || 0,
+        });
+      }
       toast.success(
         esEdicion
           ? "Producto actualizado correctamente."
@@ -283,6 +368,7 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
       onCerrar?.();
     } catch (err) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setGuardando(false);
     }
@@ -342,6 +428,128 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
             </Selector>
           </Campo>
 
+          <div className="rounded-2xl border border-[var(--borde)] p-4 sm:col-span-2">
+            <Interruptor
+              activo={formulario.conVariantes}
+              onCambio={(valor) =>
+                setFormulario((anterior) => ({
+                  ...anterior,
+                  conVariantes: valor,
+                  variantes: valor ? anterior.variantes : [],
+                }))
+              }
+              etiqueta="Este producto tiene variantes"
+              descripcion="Cada variante tendrá su propio SKU, stock y opcionalmente su propio precio de venta."
+            />
+
+            {formulario.conVariantes ? (
+              <div className="mt-4 space-y-2">
+                <p className="text-[10px] text-[var(--texto-tenue)]">
+                  Elige una sugerencia según la categoría o crea una variante
+                  personalizada.
+                </p>
+                {formulario.variantes.map((variante, indice) => (
+                  <div
+                    key={variante.id || `nueva-${indice}`}
+                    className="grid gap-2 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] p-3 sm:grid-cols-[1.3fr_0.7fr_0.8fr_auto]"
+                  >
+                    <div className="space-y-1.5">
+                      <Selector
+                        value={
+                          sugerencias.includes(variante.nombre)
+                            ? variante.nombre
+                            : "__otro__"
+                        }
+                        onChange={(evento) => {
+                          const valor = evento.target.value;
+                          actualizarVariante(
+                            indice,
+                            "nombre",
+                            valor === "__otro__" ? "" : valor
+                          );
+                        }}
+                      >
+                        <optgroup label="Sugerencias">
+                          {sugerencias.map((sugerencia) => (
+                            <option key={sugerencia} value={sugerencia}>
+                              {sugerencia}
+                            </option>
+                          ))}
+                        </optgroup>
+                        <option value="__otro__">Otro (personalizado)</option>
+                      </Selector>
+                      {!sugerencias.includes(variante.nombre) ? (
+                        <Entrada
+                          value={variante.nombre}
+                          onChange={(evento) =>
+                            actualizarVariante(
+                              indice,
+                              "nombre",
+                              evento.target.value
+                            )
+                          }
+                          placeholder="Escribe la variante personalizada"
+                          maxLength={120}
+                        />
+                      ) : null}
+                    </div>
+                    <Entrada
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={variante.stock}
+                      onChange={(evento) =>
+                        actualizarVariante(indice, "stock", evento.target.value)
+                      }
+                      placeholder="Stock"
+                    />
+                    <Entrada
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={variante.precioVes}
+                      onChange={(evento) =>
+                        actualizarVariante(indice, "precioVes", evento.target.value)
+                      }
+                      placeholder="Precio Bs. (opc.)"
+                    />
+                    <Boton
+                      variante="fantasma"
+                      tamano="icono"
+                      onClick={() => eliminarVariante(indice)}
+                      title="Eliminar variante"
+                    >
+                      <Trash2 className="h-4 w-4 text-[var(--peligro)]" />
+                    </Boton>
+                    <div className="sm:col-span-4 flex flex-wrap items-center gap-2 text-[10px] text-[var(--texto-tenue)]">
+                      <Etiqueta variante="neutra">
+                        {variante.sku || "SKU automático"}
+                      </Etiqueta>
+                      <span>
+                        Precio sin override: {formatearVes(venta.ves)} ·{" "}
+                        {formatearUsd(venta.usd)}
+                      </span>
+                      {variante.precioVes ? (
+                        <span className="font-semibold text-[var(--primario-fuerte)]">
+                          Override: {formatearVes(variante.precioVes)} ·{" "}
+                          {formatearUsd(
+                            tasaUsada > 0
+                              ? limpiarNumero(variante.precioVes) / tasaUsada
+                              : 0
+                          )}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+                <Boton variante="secundario" tamano="sm" onClick={agregarVariante}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar variante
+                </Boton>
+              </div>
+            ) : null}
+          </div>
+
           <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
             <Campo
               etiqueta="SKU Interno"
@@ -398,6 +606,77 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
               maxLength={500}
             />
           </Campo>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--texto-suave)]">
+              Foto del producto
+            </h3>
+            {foto ? <Etiqueta variante="exito">Foto lista</Etiqueta> : null}
+          </div>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[var(--borde)] bg-[var(--superficie)]">
+              {foto ? (
+                <img
+                  src={foto}
+                  alt={`Foto de ${formulario.nombre || "producto"}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <Camera className="h-7 w-7 text-[var(--texto-tenue)]" />
+              )}
+            </div>
+            <div className="flex flex-1 flex-wrap items-start gap-2">
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={procesandoFoto || guardando}
+                onClick={() => entradaCamara.current?.click()}
+              >
+                <Camera className="h-3.5 w-3.5" />
+                Tomar foto
+              </Boton>
+              <Boton
+                variante="secundario"
+                tamano="sm"
+                disabled={procesandoFoto || guardando}
+                onClick={() => entradaGaleria.current?.click()}
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                Subir desde galería
+              </Boton>
+              {foto ? (
+                <Boton
+                  variante="peligroSuave"
+                  tamano="sm"
+                  disabled={guardando}
+                  onClick={quitarFoto}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Quitar foto
+                </Boton>
+              ) : null}
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] text-[var(--texto-tenue)]">
+            La foto se comprime antes de guardarse y se usa en la tienda virtual.
+          </p>
+          <input
+            ref={entradaCamara}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={procesarFoto}
+          />
+          <input
+            ref={entradaGaleria}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={procesarFoto}
+          />
         </div>
 
         <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-4">
@@ -564,128 +843,6 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
 
         <div className="rounded-2xl border border-[var(--borde)] p-4">
           <Interruptor
-            activo={formulario.conVariantes}
-            onCambio={(valor) =>
-              setFormulario((anterior) => ({
-                ...anterior,
-                conVariantes: valor,
-                variantes: valor ? anterior.variantes : [],
-              }))
-            }
-            etiqueta="Este producto tiene variantes"
-            descripcion="Cada variante tendrá su propio SKU, stock y opcionalmente su propio precio de venta."
-          />
-
-          {formulario.conVariantes ? (
-            <div className="mt-4 space-y-2">
-              <p className="text-[10px] text-[var(--texto-tenue)]">
-                Elige una sugerencia según la categoría o crea una variante
-                personalizada.
-              </p>
-              {formulario.variantes.map((variante, indice) => (
-                <div
-                  key={variante.id || `nueva-${indice}`}
-                  className="grid gap-2 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] p-3 sm:grid-cols-[1.3fr_0.7fr_0.8fr_auto]"
-                >
-                  <div className="space-y-1.5">
-                    <Selector
-                      value={
-                        sugerencias.includes(variante.nombre)
-                          ? variante.nombre
-                          : "__otro__"
-                      }
-                      onChange={(evento) => {
-                        const valor = evento.target.value;
-                        actualizarVariante(
-                          indice,
-                          "nombre",
-                          valor === "__otro__" ? "" : valor
-                        );
-                      }}
-                    >
-                      <optgroup label="Sugerencias">
-                        {sugerencias.map((sugerencia) => (
-                          <option key={sugerencia} value={sugerencia}>
-                            {sugerencia}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <option value="__otro__">Otro (personalizado)</option>
-                    </Selector>
-                    {!sugerencias.includes(variante.nombre) ? (
-                      <Entrada
-                        value={variante.nombre}
-                        onChange={(evento) =>
-                          actualizarVariante(
-                            indice,
-                            "nombre",
-                            evento.target.value
-                          )
-                        }
-                        placeholder="Escribe la variante personalizada"
-                        maxLength={120}
-                      />
-                    ) : null}
-                  </div>
-                  <Entrada
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={variante.stock}
-                    onChange={(evento) =>
-                      actualizarVariante(indice, "stock", evento.target.value)
-                    }
-                    placeholder="Stock"
-                  />
-                  <Entrada
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={variante.precioVes}
-                    onChange={(evento) =>
-                      actualizarVariante(indice, "precioVes", evento.target.value)
-                    }
-                    placeholder="Precio Bs. (opc.)"
-                  />
-                  <Boton
-                    variante="fantasma"
-                    tamano="icono"
-                    onClick={() => eliminarVariante(indice)}
-                    title="Eliminar variante"
-                  >
-                    <Trash2 className="h-4 w-4 text-[var(--peligro)]" />
-                  </Boton>
-                  <div className="sm:col-span-4 flex flex-wrap items-center gap-2 text-[10px] text-[var(--texto-tenue)]">
-                    <Etiqueta variante="neutra">
-                      {variante.sku || "SKU automático"}
-                    </Etiqueta>
-                    <span>
-                      Precio sin override: {formatearVes(venta.ves)} ·{" "}
-                      {formatearUsd(venta.usd)}
-                    </span>
-                    {variante.precioVes ? (
-                      <span className="font-semibold text-[var(--primario-fuerte)]">
-                        Override: {formatearVes(variante.precioVes)} ·{" "}
-                        {formatearUsd(
-                          tasaUsada > 0
-                            ? limpiarNumero(variante.precioVes) / tasaUsada
-                            : 0
-                        )}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-              <Boton variante="secundario" tamano="sm" onClick={agregarVariante}>
-                <Plus className="h-3.5 w-3.5" />
-                Agregar variante
-              </Boton>
-            </div>
-          ) : null}
-        </div>
-
-        <div className="rounded-2xl border border-[var(--borde)] p-4">
-          <Interruptor
             activo={formulario.ofertaActiva}
             onCambio={(valor) => cambiar("ofertaActiva", valor)}
             etiqueta="Activar oferta por cantidad"
@@ -727,6 +884,15 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
           etiqueta="Producto activo"
           descripcion="Los productos inactivos no aparecen en el punto de venta."
         />
+
+        <div className="rounded-2xl border border-[var(--borde)] p-4">
+          <Interruptor
+            activo={formulario.visibleTienda}
+            onCambio={(valor) => cambiar("visibleTienda", valor)}
+            etiqueta="Mostrar en tienda virtual"
+            descripcion="Permite que este producto sea visible en la tienda virtual."
+          />
+        </div>
       </form>
       </Modal>
 

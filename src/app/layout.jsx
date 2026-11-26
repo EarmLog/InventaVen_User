@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { ProveedorSesion } from "@/context/SesionContext";
 import { ProveedorTema } from "@/context/TemaContext";
+import ProveedorPWA from "@/components/ui/ProveedorPWA";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,6 +22,12 @@ export const metadata = {
   },
   description:
     "Gestiona tu inventario, punto de venta, facturas y análisis con InventaVen.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "InventaVen",
+  },
 };
 
 export const viewport = {
@@ -40,6 +47,7 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ProveedorTema>
           <ProveedorSesion>
+            <ProveedorPWA />
             {children}
             <Toaster
               position="top-right"

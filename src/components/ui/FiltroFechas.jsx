@@ -83,39 +83,52 @@ export default function FiltroFechas({
   return (
     <div
       className={[
-        "flex flex-col gap-3 rounded-2xl border border-[var(--borde)] bg-[var(--superficie)] p-3 sm:flex-row sm:items-center sm:justify-between",
+        "space-y-2.5 rounded-2xl border border-[var(--borde)] bg-[var(--superficie)] p-3",
         className,
       ].join(" ")}
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
-          <CalendarDays className="h-4 w-4 text-[var(--primario)]" />
-          Desde
-        </span>
-        <input
-          type="date"
-          className="campo h-9 w-auto min-w-[140px] px-2.5 py-1.5 text-xs"
-          value={desde}
-          max={hasta}
-          onChange={(evento) =>
-            aplicarRango(evento.target.value, hasta)
-          }
-          aria-label="Fecha inicial"
-        />
-        <span className="text-[11px] text-[var(--texto-tenue)]">hasta</span>
-        <input
-          type="date"
-          className="campo h-9 w-auto min-w-[140px] px-2.5 py-1.5 text-xs"
-          value={hasta}
-          min={desde}
-          onChange={(evento) =>
-            aplicarRango(desde, evento.target.value)
-          }
-          aria-label="Fecha final"
-        />
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
+        <CalendarDays className="h-4 w-4 text-[var(--primario)]" />
+        Período
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="min-w-0">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-tenue)]">
+            Desde
+          </span>
+          <input
+            type="date"
+            className="campo h-9 w-full min-w-0 px-2.5 py-1.5 text-xs"
+            value={desde}
+            max={hasta}
+            onChange={(evento) =>
+              aplicarRango(evento.target.value, hasta)
+            }
+            aria-label="Fecha inicial"
+          />
+        </label>
+        <label className="min-w-0">
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-tenue)]">
+            Hasta
+          </span>
+          <input
+            type="date"
+            className="campo h-9 w-full min-w-0 px-2.5 py-1.5 text-xs"
+            value={hasta}
+            min={desde}
+            onChange={(evento) =>
+              aplicarRango(desde, evento.target.value)
+            }
+            aria-label="Fecha final"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-[var(--borde)] pt-2.5">
+        <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-tenue)]">
+          Rápido
+        </span>
         {PRESETS.map((preset) => (
           <button
             key={preset.etiqueta}

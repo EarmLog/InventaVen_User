@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLiveQuery } from "dexie-react-hooks";
 import {
   Banknote,
   CreditCard,
   Fingerprint,
+  HandCoins,
   ReceiptText,
   Smartphone,
 } from "lucide-react";
@@ -16,8 +18,13 @@ import Entrada from "@/components/ui/Entrada";
 import Selector from "@/components/ui/Selector";
 import Interruptor from "@/components/ui/Interruptor";
 import Alerta from "@/components/ui/Alerta";
+import { db } from "@/lib/db/baseDatos";
 import { registrarVenta } from "@/lib/db/repositorios";
-import { TIPOS_PAGO } from "@/lib/utilidades/constantes";
+import {
+  CLAVES_AJUSTES,
+  ORIGENES_DEUDA,
+  TIPOS_PAGO,
+} from "@/lib/utilidades/constantes";
 import { formatearUsd, formatearVes, limpiarNumero, redondear } from "@/lib/utilidades/formato";
 
 const ICONOS = {
@@ -25,6 +32,7 @@ const ICONOS = {
   tarjeta: CreditCard,
   biopago: Fingerprint,
   pagomovil: Smartphone,
+  deuda: HandCoins,
 };
 
 export default function ModalCobro({
@@ -41,24 +49,58 @@ export default function ModalCobro({
   const [tipoPago, setTipoPago] = useState("efectivo");
   const [moneda, setMoneda] = useState("VES");
   const [monto, setMonto] = useState("");
+  const [origenCredito, setOrigenCredito] = useState("fiado");
+  const [clienteId, setClienteId] = useState("");
   const [clienteNombre, setClienteNombre] = useState("");
+  const [clienteTelefono, setClienteTelefono] = useState("");
   const [clienteDocumento, setClienteDocumento] = useState("");
+  const [clienteDireccion, setClienteDireccion] = useState("");
+  const [clienteNotas, setClienteNotas] = useState("");
   const [notas, setNotas] = useState("");
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
 
+  const ajusteDeuda = useLiveQuery(
+    () => (db ? db.ajustes.get(CLAVES_AJUSTES.METODO_DEUDA_ACTIVO) : null),
+    [],
+    null
+  );
+  const clientes = useLiveQuery(
+    () => (db ? db.clientes.orderBy("nombre").toArray() : []),
+    [],
+    []
+  );
+  const metodoDeudaActivo =
+    ajusteDeuda?.valor === true || ajusteDeuda?.valor === "true";
+  const esDeuda = tipoPago === "deuda";
   const esEfectivo = tipoPago === "efectivo";
   const tasaUsada = Number(tasa) || 0;
+  const tiposDisponibles = TIPOS_PAGO.filter((tipo) =>
+    tipo.valor === "deuda" ? metodoDeudaActivo : !tipo.oculto
+  );
+  const origenEtiqueta =
+    ORIGENES_DEUDA.find((origen) => origen.valor === origenCredito)?.etiqueta ||
+    "Fiado";
 
   useEffect(() => {
     if (!abierto) return;
     setTipoPago("efectivo");
     setMoneda("VES");
+    setOrigenCredito("fiado");
+    setClienteId("");
     setClienteNombre("");
+    setClienteTelefono("");
     setClienteDocumento("");
+    setClienteDireccion("");
+    setClienteNotas("");
     setNotas("");
     setError("");
   }, [abierto]);
+
+  useEffect(() => {
+    if (!abierto || metodoDeudaActivo || tipoPago !== "deuda") return;
+    setTipoPago("efectivo");
+  }, [abierto, metodoDeudaActivo, tipoPago]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -74,6 +116,16 @@ export default function ModalCobro({
   const vueltoVes = redondear(recibidoVes - totales.totalVes);
   const faltante = esEfectivo && vueltoVes < 0;
 
+  function seleccionarCliente(id) {
+    setClienteId(id);
+    const cliente = clientes.find((registro) => registro.id === id);
+    setClienteNombre(cliente?.nombre || "");
+    setClienteTelefono(cliente?.telefono || "");
+    setClienteDocumento(cliente?.documento || "");
+    setClienteDireccion(cliente?.direccion || "");
+    setClienteNotas(cliente?.notas || "");
+  }
+
   async function cobrar() {
     setError("");
     if (!items.length) {
@@ -88,6 +140,10 @@ export default function ModalCobro({
       setError("El monto recibido es menor al total de la venta.");
       return;
     }
+    if (esDeuda && !clienteNombre.trim()) {
+      setError("El nombre del cliente es obligatorio para registrar la deuda.");
+      return;
+    }
     setProcesando(true);
     try {
       const venta = await registrarVenta({
@@ -97,11 +153,28 @@ export default function ModalCobro({
         clienteDocumento,
         notas,
         tasaUsd: tasaUsada,
-        montoRecibidoVes: esEfectivo ? recibidoVes : totales.totalVes,
+        montoRecibidoVes: esDeuda ? 0 : esEfectivo ? recibidoVes : totales.totalVes,
         aplicarIva,
         porcentajeIva,
+        clienteId: esDeuda ? clienteId || null : null,
+        cliente: esDeuda
+          ? {
+              ...(clienteId ? { id: clienteId } : {}),
+              nombre: clienteNombre,
+              telefono: clienteTelefono,
+              documento: clienteDocumento,
+              direccion: clienteDireccion,
+              notas: clienteNotas,
+            }
+          : null,
+        esCredito: esDeuda,
+        origenCredito: esDeuda ? origenCredito : "fiado",
       });
-      toast.success(`Venta ${venta.numeroFactura} registrada.`);
+      toast.success(
+        esDeuda
+          ? `Deuda ${venta.numeroFactura} registrada.`
+          : `Venta ${venta.numeroFactura} registrada.`
+      );
       onVenta?.(venta);
       onCerrar?.();
     } catch (err) {
@@ -125,8 +198,13 @@ export default function ModalCobro({
             Volver al carrito
           </Boton>
           <Boton onClick={cobrar} cargando={procesando}>
-            <ReceiptText className="h-4 w-4" />
-            Confirmar cobro · {formatearVes(totales.totalVes)}
+            {esDeuda ? (
+              <HandCoins className="h-4 w-4" />
+            ) : (
+              <ReceiptText className="h-4 w-4" />
+            )}
+            {esDeuda ? "Confirmar deuda" : "Confirmar cobro"} ·{" "}
+            {formatearVes(totales.totalVes)}
           </Boton>
         </>
       }
@@ -158,6 +236,15 @@ export default function ModalCobro({
               Base {formatearVes(totales.baseVes)} + IVA {formatearVes(totales.ivaVes)}
             </p>
           ) : null}
+          {esDeuda ? (
+            <div className="mt-2 flex items-start gap-2 border-t border-[var(--primario)]/20 pt-2">
+              <HandCoins className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <p className="text-[11px] font-semibold leading-relaxed text-[var(--primario-fuerte)]">
+                El total quedará como deuda ({origenEtiqueta}) y podrás cobrarlo
+                desde Deudores y cobranzas.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-[var(--borde)] px-4 py-3">
@@ -174,7 +261,7 @@ export default function ModalCobro({
             Método de pago
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {TIPOS_PAGO.map((tipo) => {
+            {tiposDisponibles.map((tipo) => {
               const Icono = ICONOS[tipo.valor] || Banknote;
               const activo = tipoPago === tipo.valor;
               return (
@@ -251,6 +338,11 @@ export default function ModalCobro({
               </span>
             </div>
           </div>
+        ) : esDeuda ? (
+          <Alerta tipo="advertencia">
+            Se registrará {formatearVes(totales.totalVes)} como deuda por {origenEtiqueta}.
+            No se solicita monto recibido ni vuelto; el stock se descontará al confirmar.
+          </Alerta>
         ) : (
           <Alerta tipo="info">
             Confirma el cobro por {formatearVes(totales.totalVes)} mediante{" "}
@@ -259,24 +351,98 @@ export default function ModalCobro({
           </Alerta>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Campo etiqueta="Cliente (opcional)">
-            <Entrada
-              value={clienteNombre}
-              onChange={(evento) => setClienteNombre(evento.target.value)}
-              placeholder="Nombre o razón social"
-              maxLength={160}
-            />
-          </Campo>
-          <Campo etiqueta="Cédula / RIF (opcional)">
-            <Entrada
-              value={clienteDocumento}
-              onChange={(evento) => setClienteDocumento(evento.target.value)}
-              placeholder="V-12345678"
-              maxLength={40}
-            />
-          </Campo>
-        </div>
+        {esDeuda ? (
+          <div className="space-y-3 rounded-2xl border border-[var(--borde)] p-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Campo etiqueta="Origen de la deuda" requerido>
+                <Selector
+                  value={origenCredito}
+                  onChange={(evento) => setOrigenCredito(evento.target.value)}
+                >
+                  {ORIGENES_DEUDA.map((origen) => (
+                    <option key={origen.valor} value={origen.valor}>
+                      {origen.etiqueta}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo etiqueta="Cliente" requerido>
+                <Selector
+                  value={clienteId}
+                  onChange={(evento) => seleccionarCliente(evento.target.value)}
+                >
+                  <option value="">Nuevo cliente</option>
+                  {clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nombre}
+                      {cliente.documento ? ` · ${cliente.documento}` : ""}
+                    </option>
+                  ))}
+                </Selector>
+              </Campo>
+              <Campo etiqueta="Nombre del cliente" requerido>
+                <Entrada
+                  value={clienteNombre}
+                  onChange={(evento) => setClienteNombre(evento.target.value)}
+                  placeholder="Nombre o razón social"
+                  maxLength={160}
+                />
+              </Campo>
+              <Campo etiqueta="Teléfono">
+                <Entrada
+                  value={clienteTelefono}
+                  onChange={(evento) => setClienteTelefono(evento.target.value)}
+                  placeholder="0414-1234567"
+                  maxLength={40}
+                />
+              </Campo>
+              <Campo etiqueta="Cédula / RIF">
+                <Entrada
+                  value={clienteDocumento}
+                  onChange={(evento) => setClienteDocumento(evento.target.value)}
+                  placeholder="V-12345678"
+                  maxLength={40}
+                />
+              </Campo>
+              <Campo etiqueta="Dirección" className="sm:col-span-2">
+                <Entrada
+                  value={clienteDireccion}
+                  onChange={(evento) => setClienteDireccion(evento.target.value)}
+                  placeholder="Dirección del cliente"
+                  maxLength={200}
+                />
+              </Campo>
+              <Campo etiqueta="Notas del cliente" className="sm:col-span-2">
+                <textarea
+                  className="campo min-h-16 resize-y"
+                  value={clienteNotas}
+                  onChange={(evento) => setClienteNotas(evento.target.value)}
+                  placeholder="Referencias, contacto, observaciones..."
+                  maxLength={500}
+                />
+              </Campo>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Cliente (opcional)">
+              <Entrada
+                value={clienteNombre}
+                onChange={(evento) => setClienteNombre(evento.target.value)}
+                placeholder="Nombre o razón social"
+                maxLength={160}
+              />
+            </Campo>
+            <Campo etiqueta="Cédula / RIF (opcional)">
+              <Entrada
+                value={clienteDocumento}
+                onChange={(evento) => setClienteDocumento(evento.target.value)}
+                placeholder="V-12345678"
+                maxLength={40}
+              />
+            </Campo>
+          </div>
+        )}
 
         <Campo etiqueta="Notas de la venta (opcional)">
           <textarea

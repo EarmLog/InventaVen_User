@@ -231,6 +231,64 @@ export function GraficoGananciaMargen({ datos = [], altura = 280, moneda = "VES"
   );
 }
 
+export function GraficoDeudores({ datos = [], altura = 280, moneda = "VES" }) {
+  const claveSaldo = moneda === "USD" ? "saldoUsd" : "saldoVes";
+  const claveAbonado = moneda === "USD" ? "abonadoUsd" : "abonadoVes";
+
+  if (!datos.length) {
+    return (
+      <div className="flex h-[240px] items-center justify-center text-xs text-[var(--texto-suave)]">
+        Sin deudas ni cobranzas en el período.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: "100%", height: altura }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={datos} margin={{ top: 12, right: 8, left: -16, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="4 4" stroke="var(--borde)" vertical={false} />
+          <XAxis
+            dataKey="etiqueta"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "var(--texto-suave)" }}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "var(--texto-suave)" }}
+            tickFormatter={compacto}
+            width={58}
+          />
+          <Tooltip content={<TooltipAnalitico moneda={moneda} />} />
+          <Legend
+            verticalAlign="top"
+            height={28}
+            formatter={(valor) => (
+              <span style={{ fontSize: 11, color: "var(--texto-suave)" }}>{valor}</span>
+            )}
+          />
+          <Bar
+            dataKey={claveSaldo}
+            name="Por cobrar"
+            fill="#f59e0b"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={32}
+          />
+          <Bar
+            dataKey={claveAbonado}
+            name="Abonado"
+            fill="#059669"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={32}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function GraficoPagos({ datos = [], altura = 280, moneda = "VES" }) {
   if (!datos.length) {
     return (
@@ -313,7 +371,12 @@ export function GraficoProductos({
   );
 }
 
-export function GraficoCategorias({ datos = [], altura = 300, moneda = "VES" }) {
+export function GraficoCategorias({
+  datos = [],
+  altura = 300,
+  moneda = "VES",
+  nombre = "Ingresos",
+}) {
   if (!datos.length) {
     return (
       <div className="flex h-[240px] items-center justify-center text-xs text-[var(--texto-suave)]">
@@ -340,7 +403,7 @@ export function GraficoCategorias({ datos = [], altura = 300, moneda = "VES" }) 
             tick={{ fontSize: 10, fill: "var(--texto-suave)" }}
           />
           <Tooltip content={<TooltipAnalitico moneda={moneda} />} />
-          <Bar dataKey="valor" name="Ingresos" radius={[0, 8, 8, 0]}>
+          <Bar dataKey="valor" name={nombre} radius={[0, 8, 8, 0]}>
             {datos.map((entrada, indice) => (
               <Cell key={entrada.nombre} fill={COLORES[indice % COLORES.length]} />
             ))}

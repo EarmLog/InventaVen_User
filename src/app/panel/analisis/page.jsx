@@ -6,8 +6,10 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
+  CheckCircle2,
   CircleDollarSign,
   Eye,
+  HandCoins,
   FileSpreadsheet,
   FileText,
   Minus,
@@ -17,6 +19,7 @@ import {
   TrendingUp,
   TriangleAlert,
   Trash2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/db/baseDatos";
@@ -32,6 +35,7 @@ import ModalReportarError from "@/components/modules/analisis/ModalReportarError
 import {
   GraficoCategorias,
   GraficoComparacion,
+  GraficoDeudores,
   GraficoGananciaMargen,
   GraficoPagos,
   GraficoProductos,
@@ -50,7 +54,11 @@ import {
   rankingProductos,
 } from "@/lib/utilidades/analisis";
 import { resumirFacturacion, resumirCompras } from "@/lib/utilidades/fiscalidad";
-import { eliminarCompra } from "@/lib/db/repositorios";
+import {
+  eliminarCompra,
+  listarAbonos,
+  listarDeudas,
+} from "@/lib/db/repositorios";
 import { imprimirComprobanteCompra } from "@/lib/utilidades/impresora";
 import {
   fechaParaInput,
@@ -90,6 +98,15 @@ function formatearMonto(usd, ves, moneda) {
 
 function valorMoneda(registro, campo, moneda) {
   return moneda === "USD" ? registro?.[`${campo}Usd`] : registro?.[`${campo}Ves`];
+}
+
+function registroEnRango(registro, desde, hasta) {
+  if (!registro?.fecha) return true;
+  const fecha = new Date(registro.fecha);
+  if (Number.isNaN(fecha.getTime())) return false;
+  if (desde && fecha < new Date(`${desde}T00:00:00`)) return false;
+  if (hasta && fecha > new Date(`${hasta}T23:59:59`)) return false;
+  return true;
 }
 
 function variacionVisual(variacion) {
@@ -179,6 +196,8 @@ export default function PaginaAnalisis() {
       [],
       []
     ) || [];
+  const deudas = useLiveQuery(() => listarDeudas(), [], []) || [];
+  const abonos = useLiveQuery(() => listarAbonos(), [], []) || [];
   const [desde, setDesde] = useState(() =>
     fechaParaInput(sumarDias(new Date(), -29))
   );
@@ -192,7 +211,7 @@ export default function PaginaAnalisis() {
   const esUsd = moneda === "USD";
 
   const ventasValidas = useMemo(
-    () => ventas.filter(esVentaEnAnalisis),
+    () => ventas.filter((venta) => esVentaEnAnalisis(venta) && !venta.esCredito),
     [ventas]
   );
 
@@ -300,6 +319,87 @@ export default function PaginaAnalisis() {
 
   const resumenCompras = useMemo(() => resumirCompras(comprasEnRango), [comprasEnRango]);
 
+  const deudasEnRango = useMemo(
+    () => deudas.filter((deuda) => registroEnRango(deuda, desde, hasta)),
+    [deudas, desde, hasta]
+  );
+
+  const abonosEnRango = useMemo(
+    () => abonos.filter((abono) => registroEnRango(abono, desde, hasta)),
+    [abonos, desde, hasta]
+  );
+
+  const resumenDeudas = useMemo(() => {
+    const activas = deudasEnRango.filter((deuda) => deuda.estado !== "pagada");
+    const pagadas = deudasEnRango.filter((deuda) => deuda.estado === "pagada");
+    const clientesActivos = new Set(
+      activas.map((deuda) => deuda.clienteId || deuda.id).filter(Boolean)
+    );
+    return {
+      porCobrarUsd: redondear(
+        activas.reduce((total, deuda) => total + Number(deuda.saldoUsd || 0), 0)
+      ),
+      porCobrarVes: redondear(
+        activas.reduce((total, deuda) => total + Number(deuda.saldoVes || 0), 0)
+      ),
+      abonadoUsd: redondear(
+        abonosEnRango.reduce((total, abono) => total + Number(abono.montoUsd || 0), 0)
+      ),
+      abonadoVes: redondear(
+        abonosEnRango.reduce((total, abono) => total + Number(abono.montoVes || 0), 0)
+      ),
+      deudoresActivos: clientesActivos.size,
+      pagadas: pagadas.length,
+    };
+  }, [deudasEnRango, abonosEnRango]);
+
+  const datosDeudores = useMemo(() => {
+    if (!desde || !hasta) return [];
+    const dias = [];
+    let actual = new Date(`${desde}T00:00:00`);
+    const limite = new Date(`${hasta}T00:00:00`);
+    while (actual <= limite) {
+      dias.push({
+        clave: fechaParaInput(actual),
+        etiqueta: formatearFecha(actual),
+        saldoUsd: 0,
+        saldoVes: 0,
+        abonadoUsd: 0,
+        abonadoVes: 0,
+      });
+      actual = sumarDias(actual, 1);
+    }
+    const porDia = new Map(dias.map((dia) => [dia.clave, dia]));
+    deudasEnRango.forEach((deuda) => {
+      if (deuda.estado === "pagada" || !deuda.fecha) return;
+      const dia = porDia.get(fechaParaInput(deuda.fecha));
+      if (!dia) return;
+      dia.saldoUsd += Number(deuda.saldoUsd) || 0;
+      dia.saldoVes += Number(deuda.saldoVes) || 0;
+    });
+    abonosEnRango.forEach((abono) => {
+      const dia = porDia.get(fechaParaInput(abono.fecha));
+      if (!dia) return;
+      dia.abonadoUsd += Number(abono.montoUsd) || 0;
+      dia.abonadoVes += Number(abono.montoVes) || 0;
+    });
+    return dias
+      .map((dia) => ({
+        etiqueta: dia.etiqueta,
+        saldoUsd: redondear(dia.saldoUsd),
+        saldoVes: redondear(dia.saldoVes),
+        abonadoUsd: redondear(dia.abonadoUsd),
+        abonadoVes: redondear(dia.abonadoVes),
+      }))
+      .filter(
+        (dia) =>
+          dia.saldoUsd > 0 ||
+          dia.saldoVes > 0 ||
+          dia.abonadoUsd > 0 ||
+          dia.abonadoVes > 0
+      );
+  }, [deudasEnRango, abonosEnRango, desde, hasta]);
+
   const datosPagos = useMemo(() => {
     return TIPOS_PAGO.map((tipo) => {
       const ventasTipo = enRango.filter((venta) => venta.tipoPago === tipo.valor);
@@ -381,6 +481,8 @@ export default function PaginaAnalisis() {
     { Indicador: "Descuentos VES", Valor: formatearVes(totales.descuentoVes) },
     { Indicador: "IVA USD", Valor: formatearUsd(totales.ivaUsd) },
     { Indicador: "IVA VES", Valor: formatearVes(totales.ivaVes) },
+    { Indicador: "Abonos cobrados USD", Valor: formatearUsd(resumenDeudas.abonadoUsd) },
+    { Indicador: "Abonos cobrados VES", Valor: formatearVes(resumenDeudas.abonadoVes) },
   ];
 
   const facturasExportacion = enRango.map((venta) => {
@@ -754,6 +856,69 @@ export default function PaginaAnalisis() {
           ) : null}
         </Tarjeta>
       </div>
+
+      <Tarjeta className="p-4 sm:p-5">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold">Deudas y cobranzas</h2>
+            <p className="text-[11px] text-[var(--texto-suave)]">
+              Saldos pendientes e ingresos por abonos del período seleccionado.
+            </p>
+          </div>
+          <Etiqueta variante="exito">
+            <HandCoins className="h-3 w-3" />
+            {formatearMonto(
+              resumenDeudas.abonadoUsd,
+              resumenDeudas.abonadoVes,
+              moneda
+            )}
+          </Etiqueta>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Indicador
+            Icono={CircleDollarSign}
+            etiqueta="Por cobrar"
+            valor={formatearMonto(
+              resumenDeudas.porCobrarUsd,
+              resumenDeudas.porCobrarVes,
+              moneda
+            )}
+            detalle={formatearMonto(
+              resumenDeudas.porCobrarUsd,
+              resumenDeudas.porCobrarVes,
+              otraMoneda
+            )}
+            tono="ambar"
+          />
+          <Indicador
+            Icono={HandCoins}
+            etiqueta="Ingresos por abonos"
+            valor={formatearMonto(
+              resumenDeudas.abonadoUsd,
+              resumenDeudas.abonadoVes,
+              moneda
+            )}
+            detalle={`${abonosEnRango.length} abono${abonosEnRango.length === 1 ? "" : "s"} registrado${abonosEnRango.length === 1 ? "" : "s"}`}
+          />
+          <Indicador
+            Icono={Users}
+            etiqueta="Deudores activos"
+            valor={formatearNumero(resumenDeudas.deudoresActivos)}
+            detalle="Clientes con saldo pendiente"
+            tono="violeta"
+          />
+          <Indicador
+            Icono={CheckCircle2}
+            etiqueta="Deudas pagadas"
+            valor={formatearNumero(resumenDeudas.pagadas)}
+            detalle="Saldadas en el período"
+            tono="azul"
+          />
+        </div>
+        <div className="mt-4 border-t border-[var(--borde)] pt-4">
+          <GraficoDeudores datos={datosDeudores} moneda={moneda} altura={270} />
+        </div>
+      </Tarjeta>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Tarjeta className="p-4 sm:p-5">

@@ -66,6 +66,30 @@ class BaseDatosInventaVen extends Dexie {
       compras: "id, fecha, tipo, estado, totalUsd, createdAt, updatedAt",
       cajas: "id, nombre, codigo, estado, creador, fechaCreacion, fechaCierre",
     });
+    this.version(6).stores({
+      productos:
+        "id, sku, nombre, categoria, activo, creadoEn, actualizadoEn, fechaRenovacion, visibleTienda",
+      ventas:
+        "id, codigo, numeroFactura, fecha, estado, tipoPago, creadoEn, esCredito, deudaId",
+      ajustes: "clave",
+      secuencias: "nombre",
+      movimientos: "id, productoId, varianteId, tipo, fecha",
+      facturasFiscales:
+        "id, ventaId, tipo, estado, fecha, totalUsd, createdAt, updatedAt",
+      auditorias:
+        "id, usuarioId, accion, entidad, entidadId, fecha, detalle",
+      operacionesEspeciales:
+        "id, tipo, entidadId, entidadTipo, fecha, detalle, estado",
+      proveedores: "id, nombre, rif, telefono, email, creadoEn",
+      compras: "id, fecha, tipo, estado, totalUsd, createdAt, updatedAt",
+      cajas: "id, nombre, codigo, estado, creador, fechaCreacion, fechaCierre",
+      clientes: "id, nombre, telefono, documento, creadoEn, actualizadoEn",
+      deudas:
+        "id, ventaId, clienteId, origen, estado, fecha, saldoUsd, saldoVes, creadoEn, actualizadoEn",
+      abonos:
+        "id, deudaId, clienteId, ventaId, fecha, montoUsd, montoVes, metodoPago",
+      imagenesProducto: "id, productoId, creadoEn, actualizadoEn",
+    });
   }
 }
 
@@ -99,11 +123,17 @@ export async function asegurarDatosIniciales() {
     { clave: CLAVES_AJUSTES.TASA_USD, valor: 0 },
     { clave: CLAVES_AJUSTES.TASA_ACTUALIZADA_EN, valor: null },
     { clave: CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS, valor: null },
+    { clave: CLAVES_AJUSTES.METODO_DEUDA_ACTIVO, valor: false },
+    { clave: CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR, valor: false },
+    { clave: CLAVES_AJUSTES.COMISION_CASHEA, valor: 0 },
+    { clave: CLAVES_AJUSTES.TIENDA_ACTIVA, valor: false },
+    { clave: CLAVES_AJUSTES.TIENDA_PUBLICADA_EN, valor: null },
   ];
   const secuenciasIniciales = [
     { nombre: SECUENCIAS.PRODUCTOS, valor: 0 },
     { nombre: SECUENCIAS.VENTAS, valor: 0 },
     { nombre: SECUENCIAS.FACTURAS, valor: 0 },
+    { nombre: SECUENCIAS.DEUDAS, valor: 0 },
   ];
   await db.transaction("rw", db.ajustes, db.secuencias, async () => {
     for (const ajuste of ajustesIniciales) {

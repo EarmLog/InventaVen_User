@@ -1,21 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Building2,
+  Cloud,
   CloudDownload,
   CloudUpload,
+  Copy,
+  Download,
+  Globe,
+  HardDrive,
   KeyRound,
+  Link2,
   LogOut,
+  MessageCircle,
   Moon,
   RefreshCw,
   RotateCcw,
+  Send,
+  Store,
   Sun,
+  Users,
+  Wifi,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/db/baseDatos";
+import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
 import { useSesion } from "@/context/SesionContext";
 import { useTasa } from "@/context/TasaContext";
 import { useTema } from "@/context/TemaContext";
@@ -29,6 +41,11 @@ import Interruptor from "@/components/ui/Interruptor";
 import Modal from "@/components/ui/Modal";
 import Alerta from "@/components/ui/Alerta";
 import { descargarRespaldo, restaurarRespaldo } from "@/lib/db/respaldo";
+import { ejecutarCopiaAutomatica } from "@/lib/db/copiaAutomatica";
+import {
+  descargarRespaldoNube,
+  listarRespaldosNube,
+} from "@/lib/db/respaldoNube";
 import { actualizarPreciosPorTasa, guardarAjuste } from "@/lib/db/repositorios";
 import { validarContrasena } from "@/lib/seguridad/contrasena";
 import {
@@ -46,11 +63,80 @@ import {
   TIPOS_CUENTA,
 } from "@/lib/utilidades/constantes";
 import { formatearFechaHora, formatearNumero, formatearVes } from "@/lib/utilidades/formato";
+import { tasaBajoSospechosa } from "@/lib/utilidades/tasa";
+
+function formatearTamano(bytes) {
+  const valor = Number(bytes) || 0;
+  if (valor < 1024) return `${valor} B`;
+  if (valor < 1024 * 1024) return `${(valor / 1024).toFixed(1)} KB`;
+  return `${(valor / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizarSlug(valor) {
+  return String(valor || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+function imagenABase64(datos) {
+  const texto = String(datos || "");
+  if (!texto) return "";
+  const coma = texto.indexOf(",");
+  return coma >= 0 ? texto.slice(coma + 1) : texto;
+}
+
+function construirUrlTienda(slug, token) {
+  if (typeof window === "undefined") return "";
+  const base = `${window.location.origin}/tienda/${encodeURIComponent(slug || "")}`;
+  return token ? `${base}/${encodeURIComponent(token)}` : base;
+}
+
+async function obtenerEncabezadosAutenticados() {
+  const supabase = obtenerClienteSupabase();
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data?.session?.access_token) {
+    throw new Error("Inicia sesión nuevamente para publicar la tienda.");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${data.session.access_token}`,
+  };
+}
+
+async function leerRespuesta(respuesta) {
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) {
+    throw new Error(
+      datos.error || datos.mensaje || "No se pudo completar la solicitud."
+    );
+  }
+  return datos;
+}
 
 export default function PaginaConfiguracion() {
   const router = useRouter();
-  const { perfil, actualizarPerfil, cambiarClave, cerrarSesion, abrirOnboarding } = useSesion();
-  const { tasa, fechaTasa, fuente, cargandoTasa, errorTasa, refrescarTasa } = useTasa();
+  const {
+    sesion,
+    perfil,
+    actualizarPerfil,
+    cambiarClave,
+    cerrarSesion,
+    abrirOnboarding,
+  } = useSesion();
+  const {
+    tasa,
+    fechaTasa,
+    fuente,
+    cargandoTasa,
+    errorTasa,
+    refrescarTasa,
+    establecerTasaManual,
+  } = useTasa();
   const { tema, cambiarTema } = useTema();
 
   const [nombreNegocio, setNombreNegocio] = useState("");
@@ -61,6 +147,8 @@ export default function PaginaConfiguracion() {
   const [rif, setRif] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [recalculandoPrecios, setRecalculandoPrecios] = useState(false);
+  const [tasaManual, setTasaManual] = useState("");
+  const [guardandoTasaManual, setGuardandoTasaManual] = useState(false);
 
   const [nuevaClave, setNuevaClave] = useState("");
   const [confirmarClave, setConfirmarClave] = useState("");
@@ -71,6 +159,28 @@ export default function PaginaConfiguracion() {
   const [restaurando, setRestaurando] = useState(false);
   const [errorRestauracion, setErrorRestauracion] = useState("");
   const entradaArchivo = useRef(null);
+
+  const [respaldosNube, setRespaldosNube] = useState([]);
+  const [cargandoNube, setCargandoNube] = useState(false);
+  const [creandoCopiaNube, setCreandoCopiaNube] = useState(false);
+  const [errorNube, setErrorNube] = useState("");
+  const [modalNubeAbierto, setModalNubeAbierto] = useState(false);
+  const [respaldoNubeSeleccionado, setRespaldoNubeSeleccionado] = useState(null);
+  const [restaurandoNube, setRestaurandoNube] = useState(false);
+  const [errorRestauracionNube, setErrorRestauracionNube] = useState("");
+  const [modalDriveAbierto, setModalDriveAbierto] = useState(false);
+  const [preparandoOffline, setPreparandoOffline] = useState(false);
+
+  const [metodoDeudaActivo, setMetodoDeudaActivo] = useState(false);
+  const [actualizarSaldosDolar, setActualizarSaldosDolar] = useState(false);
+  const [comisionCashea, setComisionCashea] = useState("0");
+  const [guardandoComision, setGuardandoComision] = useState(false);
+  const [slugTienda, setSlugTienda] = useState("");
+  const [telefonoTienda, setTelefonoTienda] = useState("");
+  const [urlTienda, setUrlTienda] = useState("");
+  const [publicandoTienda, setPublicandoTienda] = useState(false);
+  const [renovandoTienda, setRenovandoTienda] = useState(false);
+  const ajustesInicializados = useRef(false);
 
   const productos =
     useLiveQuery(() => (db ? db.productos.count() : 0), [], 0) || 0;
@@ -88,11 +198,28 @@ export default function PaginaConfiguracion() {
       [],
       {}
     ) || {};
+  const productosVisibles =
+    useLiveQuery(
+      () =>
+        db
+          ? db.productos.filter((producto) => producto.visibleTienda === true).toArray()
+          : [],
+      [],
+      []
+    ) || [];
 
   const autoPrecios = Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_PRECIOS_AUTO]);
   const ultimaActualizacion = ajustes[CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS];
+  const ultimaTasaAplicada =
+    Number(ajustes[CLAVES_AJUSTES.TASA_ULTIMA_APLICADA]) || 0;
   const diasLicencia = Number(perfil?.diasLicencia ?? 0);
-  const sincronizacionNube = Boolean(ajustes[CLAVES_AJUSTES.SINC_NUBE]);
+  const copiaNubeActiva = Boolean(ajustes[CLAVES_AJUSTES.COPIA_NUBE_ACTIVA]);
+  const ultimaCopiaNube = ajustes[CLAVES_AJUSTES.COPIA_NUBE_ULTIMA];
+  const fechaUltimaCopiaNube = ajustes[CLAVES_AJUSTES.COPIA_NUBE_ULTIMA_FECHA];
+  const errorCopiaNube = ajustes[CLAVES_AJUSTES.COPIA_NUBE_ULTIMO_ERROR];
+  const fechaPublicacionTienda = ajustes[CLAVES_AJUSTES.TIENDA_PUBLICADA_EN];
+  const urlVisible =
+    urlTienda || construirUrlTienda(slugTienda, ajustes[CLAVES_AJUSTES.TIENDA_TOKEN]);
 
   useEffect(() => {
     const { nombre, sufijo } = separarNombreSufijo(perfil?.nombreNegocio || "");
@@ -105,6 +232,25 @@ export default function PaginaConfiguracion() {
     setTelefono(perfil?.telefono || "");
     setRif(perfil?.rif || ajustes[CLAVES_AJUSTES.RIF_NEGOCIO] || "");
   }, [perfil, ajustes]);
+
+  useEffect(() => {
+    if (ajustesInicializados.current || !Object.keys(ajustes).length) return;
+    ajustesInicializados.current = true;
+    setMetodoDeudaActivo(
+      Boolean(ajustes[CLAVES_AJUSTES.METODO_DEUDA_ACTIVO])
+    );
+    setActualizarSaldosDolar(
+      Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR])
+    );
+    setComisionCashea(
+      String(Number(ajustes[CLAVES_AJUSTES.COMISION_CASHEA] ?? 0))
+    );
+    const slug = String(ajustes[CLAVES_AJUSTES.TIENDA_SLUG] || "");
+    const token = String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
+    setSlugTienda(slug);
+    setTelefonoTienda(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""));
+    setUrlTienda(token ? construirUrlTienda(slug, token) : "");
+  }, [ajustes]);
 
   function cambiarTipoCuenta(valor) {
     setTipoCuenta(valor);
@@ -185,7 +331,237 @@ export default function PaginaConfiguracion() {
     }
   }
 
+  async function alternarMetodoDeuda(activo) {
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.METODO_DEUDA_ACTIVO, activo);
+      setMetodoDeudaActivo(activo);
+      window.dispatchEvent(new Event("inventaven-ajustes"));
+      toast.success(
+        activo
+          ? "Método de pago Deuda activado en el POS."
+          : "Método de pago Deuda desactivado en el POS."
+      );
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  async function alternarSaldosDolar(activo) {
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR, activo);
+      setActualizarSaldosDolar(activo);
+      window.dispatchEvent(new Event("inventaven-ajustes"));
+      toast.success(
+        activo
+          ? "Los saldos de deudores se actualizarán con la tasa vigente."
+          : "Los saldos de deudores ya no se actualizarán con la tasa."
+      );
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  async function guardarComisionCashea() {
+    const valor = Number(String(comisionCashea).replace(",", "."));
+    if (!Number.isFinite(valor) || valor < 0 || valor > 100) {
+      toast.error("La comisión Cashea debe estar entre 0 y 100%.");
+      return;
+    }
+    setGuardandoComision(true);
+    try {
+      const comision = Math.round(valor * 100) / 100;
+      await guardarAjuste(CLAVES_AJUSTES.COMISION_CASHEA, comision);
+      setComisionCashea(String(comision));
+      window.dispatchEvent(new Event("inventaven-ajustes"));
+      toast.success(`Comisión Cashea guardada: ${comision}%.`);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setGuardandoComision(false);
+    }
+  }
+
+  function cambiarSlugTienda(valor) {
+    setSlugTienda(normalizarSlug(valor));
+    setUrlTienda("");
+  }
+
+  async function guardarRespuestaTienda(datos, slug) {
+    const slugFinal = datos?.slug || slug;
+    const token = datos?.token || String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
+    const url = datos?.url || construirUrlTienda(slugFinal, token);
+    await guardarAjuste(CLAVES_AJUSTES.TIENDA_SLUG, slugFinal);
+    await guardarAjuste(CLAVES_AJUSTES.TIENDA_TOKEN, token);
+    await guardarAjuste(CLAVES_AJUSTES.TIENDA_ACTIVA, true);
+    await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEFONO, telefonoTienda);
+    await guardarAjuste(
+      CLAVES_AJUSTES.TIENDA_PUBLICADA_EN,
+      datos?.publicadaEn || new Date().toISOString()
+    );
+    setSlugTienda(slugFinal);
+    setUrlTienda(url);
+    window.dispatchEvent(new Event("inventaven-ajustes"));
+    return url;
+  }
+
+  async function publicarTienda() {
+    const slug = normalizarSlug(slugTienda);
+    if (!slug) {
+      toast.error("Escribe un slug para la tienda virtual.");
+      return;
+    }
+    const errorTelefono = validarTelefonoVe(telefonoTienda, {
+      obligatorio: false,
+    });
+    if (errorTelefono) {
+      toast.error(errorTelefono);
+      return;
+    }
+    setPublicandoTienda(true);
+    try {
+      const imagenes = db ? await db.imagenesProducto.toArray() : [];
+      const imagenesPorProducto = new Map(
+        imagenes.map((imagen) => [imagen.productoId, imagen])
+      );
+      const productosPublicar = productosVisibles.map((producto) => ({
+        id: producto.id,
+        nombre: producto.nombre,
+        descripcion: producto.descripcion || "",
+        categoria: producto.categoria || "Otros",
+        precioUsd: Number(producto.precioVentaUsd) || 0,
+        precioVes: Number(producto.precioVentaVes) || 0,
+        imagenBase64: imagenABase64(
+          imagenesPorProducto.get(producto.id)?.datos
+        ),
+      }));
+      const encabezados = await obtenerEncabezadosAutenticados();
+      const respuesta = await fetch("/api/tienda/publicar", {
+        method: "POST",
+        headers: encabezados,
+        body: JSON.stringify({
+          slug,
+          nombreNegocio:
+            perfil?.nombreNegocio ||
+            ajustes[CLAVES_AJUSTES.NOMBRE_NEGOCIO] ||
+            "Mi negocio",
+          telefono: telefonoTienda,
+          tasa: Number(tasa) || 0,
+          productos: productosPublicar,
+        }),
+      });
+      const datos = await leerRespuesta(respuesta);
+      await guardarRespuestaTienda(datos, slug);
+      toast.success(
+        `Tienda publicada con ${formatearNumero(
+          Number.isFinite(datos.productos) ? datos.productos : productosPublicar.length
+        )} productos.`
+      );
+    } catch (error) {
+      toast.error(error.message || "No se pudo publicar la tienda.");
+    } finally {
+      setPublicandoTienda(false);
+    }
+  }
+
+  async function renovarLinkTienda() {
+    setRenovandoTienda(true);
+    try {
+      const encabezados = await obtenerEncabezadosAutenticados();
+      const respuesta = await fetch("/api/tienda/renovar", {
+        method: "POST",
+        headers: encabezados,
+      });
+      const datos = await leerRespuesta(respuesta);
+      await guardarRespuestaTienda(datos, datos?.slug || slugTienda);
+      toast.success("Enlace de la tienda renovado correctamente.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo renovar el enlace.");
+    } finally {
+      setRenovandoTienda(false);
+    }
+  }
+
+  async function copiarLinkTienda() {
+    const url =
+      urlTienda || construirUrlTienda(slugTienda, ajustes[CLAVES_AJUSTES.TIENDA_TOKEN]);
+    if (!url) {
+      toast.error("Publica la tienda para obtener un enlace.");
+      return;
+    }
+    let copiado = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        copiado = true;
+      }
+    } catch {
+      copiado = false;
+    }
+    if (!copiado) {
+      const area = document.createElement("textarea");
+      area.value = url;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      copiado = document.execCommand("copy");
+      area.remove();
+    }
+    if (copiado) {
+      toast.success("Enlace copiado al portapapeles.");
+      return;
+    }
+    toast.error("No se pudo copiar el enlace.");
+  }
+
+  function compartirTienda(red) {
+    const url =
+      urlTienda || construirUrlTienda(slugTienda, ajustes[CLAVES_AJUSTES.TIENDA_TOKEN]);
+    if (!url) {
+      toast.error("Publica la tienda para poder compartirla.");
+      return;
+    }
+    const texto = `Mira los productos de ${
+      perfil?.nombreNegocio || "mi negocio"
+    }: ${url}`;
+    let destino = "";
+    if (red === "whatsapp") {
+      destino = telefonoTienda
+        ? `https://wa.me/${telefonoTienda}?text=${encodeURIComponent(texto)}`
+        : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    } else if (red === "facebook") {
+      destino = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    } else {
+      destino = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(texto)}`;
+    }
+    window.open(destino, "_blank", "noopener,noreferrer");
+  }
+
+  async function guardarTasaManual() {
+    const valor = Number(String(tasaManual).replace(",", "."));
+    if (!Number.isFinite(valor) || valor < 10) {
+      toast.error("La tasa manual debe ser un número igual o mayor a 10 VES por USD.");
+      return;
+    }
+    setGuardandoTasaManual(true);
+    try {
+      await establecerTasaManual(valor);
+      setTasaManual("");
+      toast.success(`Tasa manual guardada: ${formatearVes(valor)} por USD.`);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setGuardandoTasaManual(false);
+    }
+  }
+
   async function recalcularPreciosAhora() {
+    if (ultimaTasaAplicada > 0 && tasaBajoSospechosa(tasa, ultimaTasaAplicada)) {
+      toast.error(
+        "La tasa actual bajó 10% o más respecto a la última aplicada. Los precios no se actualizaron para protegerlos."
+      );
+      return;
+    }
     setRecalculandoPrecios(true);
     try {
       const actualizados = await actualizarPreciosPorTasa(tasa);
@@ -199,16 +575,162 @@ export default function PaginaConfiguracion() {
     }
   }
 
-  async function alternarSincronizacionNube(activo) {
+  const cargarRespaldosNube = useCallback(async () => {
+    if (!sesion) return;
+    setCargandoNube(true);
     try {
-      await guardarAjuste(CLAVES_AJUSTES.SINC_NUBE, activo);
-      toast.success(
-        activo
-          ? "Sincronización en la nube habilitada."
-          : "Sincronización en la nube deshabilitada."
-      );
+      const lista = await listarRespaldosNube();
+      setRespaldosNube(lista);
+      setErrorNube("");
+    } catch (error) {
+      setErrorNube(error.message);
+    } finally {
+      setCargandoNube(false);
+    }
+  }, [sesion]);
+
+  useEffect(() => {
+    cargarRespaldosNube();
+  }, [cargarRespaldosNube]);
+
+  useEffect(() => {
+    const alCambiarCopia = () => cargarRespaldosNube();
+    window.addEventListener("inventaven-copia-nube", alCambiarCopia);
+    return () => window.removeEventListener("inventaven-copia-nube", alCambiarCopia);
+  }, [cargarRespaldosNube]);
+
+  async function alternarCopiaNube(activo) {
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.COPIA_NUBE_ACTIVA, activo);
+      if (!activo) {
+        toast.success("Copia automática diaria desactivada.");
+        return;
+      }
+      setCreandoCopiaNube(true);
+      const resultado = await ejecutarCopiaAutomatica({ forzar: true });
+      if (!resultado.ejecutada) {
+        toast.info(resultado.motivo || "La copia no se pudo ejecutar todavía.");
+        return;
+      }
+      toast.success(`Copia automática activada. Se guardó ${resultado.nombre}.`);
+      await cargarRespaldosNube();
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setCreandoCopiaNube(false);
+    }
+  }
+
+  async function crearCopiaNubeAhora() {
+    setCreandoCopiaNube(true);
+    try {
+      const resultado = await ejecutarCopiaAutomatica({ forzar: true });
+      if (!resultado.ejecutada) {
+        toast.info(resultado.motivo || "La copia no se pudo ejecutar todavía.");
+        return;
+      }
+      toast.success(`Copia guardada en la nube: ${resultado.nombre}`);
+      await cargarRespaldosNube();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setCreandoCopiaNube(false);
+    }
+  }
+
+  async function prepararModoSinConexion() {
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      toast.error("Este navegador no permite el modo sin conexión.");
+      return;
+    }
+    setPreparandoOffline(true);
+    try {
+      await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, rechazar) =>
+          setTimeout(
+            () => rechazar(new Error("El service worker no está activo.")),
+            8000
+          )
+        ),
+      ]);
+      const rutas = [
+        "/panel",
+        "/panel/inventario",
+        "/panel/pos",
+        "/panel/deudores",
+        "/panel/analisis",
+        "/panel/fiscal",
+        "/panel/proveedores",
+        "/panel/auditoria",
+        "/panel/pendientes",
+        "/panel/configuracion",
+        "/offline",
+      ];
+      await Promise.all(
+        rutas.map((ruta) =>
+          fetch(ruta, { cache: "reload" }).catch(() => null)
+        )
+      );
+      if (navigator.storage?.persist) {
+        await navigator.storage.persist().catch(() => null);
+      }
+      toast.success(
+        "Modo sin conexión preparado. Abre la app desde el acceso directo aunque no tengas internet."
+      );
+    } catch {
+      toast.error(
+        "No se pudo preparar el modo sin conexión. Abre la app una vez con internet e intenta de nuevo."
+      );
+    } finally {
+      setPreparandoOffline(false);
+    }
+  }
+
+  async function descargarCopiaNube(nombre) {
+    try {
+      const blob = await descargarRespaldoNube(nombre);
+      const url = URL.createObjectURL(blob);
+      const enlace = document.createElement("a");
+      enlace.href = url;
+      enlace.download = nombre;
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Copia descargada.");
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }
+
+  function abrirRestauracionNube() {
+    setRespaldoNubeSeleccionado(null);
+    setErrorRestauracionNube("");
+    setModalNubeAbierto(true);
+    cargarRespaldosNube();
+  }
+
+  async function confirmarRestauracionNube() {
+    if (!respaldoNubeSeleccionado) return;
+    setErrorRestauracionNube("");
+    setRestaurandoNube(true);
+    try {
+      const blob = await descargarRespaldoNube(respaldoNubeSeleccionado.nombre);
+      const archivo = new File([blob], respaldoNubeSeleccionado.nombre, {
+        type: "application/zip",
+      });
+      const resultado = await restaurarRespaldo(archivo, { reemplazar: true });
+      toast.success(
+        `Copia restaurada: ${resultado.productos} productos y ${resultado.ventas} ventas.`
+      );
+      setModalNubeAbierto(false);
+      setRespaldoNubeSeleccionado(null);
+      setTimeout(() => window.location.reload(), 900);
+    } catch (error) {
+      setErrorRestauracionNube(error.message);
+    } finally {
+      setRestaurandoNube(false);
     }
   }
 
@@ -448,6 +970,29 @@ export default function PaginaConfiguracion() {
             {errorTasa ? (
               <p className="mt-1 text-[10px] text-[var(--advertencia)]">{errorTasa}</p>
             ) : null}
+            <div className="mt-3 border-t border-[var(--borde)] pt-3">
+              <Campo
+                etiqueta="Tasa manual (VES por USD)"
+                ayuda="Úsala solo si la tasa automática falla o si necesitas corregirla. No se aplica a los precios automáticamente si baja 10% o más."
+              >
+                <div className="flex gap-2">
+                  <Entrada
+                    value={tasaManual}
+                    onChange={(evento) => setTasaManual(evento.target.value)}
+                    placeholder={Number(tasa) > 0 ? String(tasa) : "Ej. 36,50"}
+                    inputMode="decimal"
+                  />
+                  <Boton
+                    variante="secundario"
+                    onClick={guardarTasaManual}
+                    cargando={guardandoTasaManual}
+                    disabled={!tasaManual}
+                  >
+                    Guardar
+                  </Boton>
+                </div>
+              </Campo>
+            </div>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -479,6 +1024,213 @@ export default function PaginaConfiguracion() {
               {ultimaActualizacion ? formatearFechaHora(ultimaActualizacion) : "nunca"}
             </strong>
           </p>
+        </Tarjeta>
+
+        <Tarjeta className="p-4 sm:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--advertencia-suave)] text-[var(--advertencia)]">
+              <Users className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold">Deudores y Cashea</h2>
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Crédito en el POS, saldos y comisión de Cashea.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <Interruptor
+              activo={metodoDeudaActivo}
+              onCambio={alternarMetodoDeuda}
+              etiqueta="Activar método de pago Deuda en POS"
+              descripcion="Permite registrar ventas a crédito desde el punto de venta."
+            />
+            <Interruptor
+              activo={actualizarSaldosDolar}
+              onCambio={alternarSaldosDolar}
+              etiqueta="Actualizar saldo de deudores con el dólar"
+              descripcion="Cada cambio de tasa recalcula el saldo en bolívares desde el saldo en dólares."
+            />
+            <div className="border-t border-[var(--borde)] pt-4">
+              <Campo
+                etiqueta="Comisión Cashea (%)"
+                ayuda="Porcentaje aplicado a las ventas con origen Cashea."
+              >
+                <div className="flex gap-2">
+                  <Entrada
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={comisionCashea}
+                    onChange={(evento) => setComisionCashea(evento.target.value)}
+                  />
+                  <Boton
+                    variante="secundario"
+                    onClick={guardarComisionCashea}
+                    cargando={guardandoComision}
+                    disabled={comisionCashea === ""}
+                  >
+                    Guardar
+                  </Boton>
+                </div>
+              </Campo>
+            </div>
+          </div>
+        </Tarjeta>
+
+        <Tarjeta className="p-4 sm:p-5 xl:col-span-2">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--info-suave)] text-[var(--info)]">
+              <Store className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold">Tienda virtual</h2>
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Publica los productos marcados como visibles en la tienda.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <Campo
+                etiqueta="Slug de la tienda"
+                ayuda="Se usa en el enlace público. Solo letras, números y guiones."
+              >
+                <Entrada
+                  value={slugTienda}
+                  onChange={(evento) => cambiarSlugTienda(evento.target.value)}
+                  placeholder="mi-tienda"
+                  maxLength={48}
+                />
+              </Campo>
+              <Campo
+                etiqueta="Teléfono de WhatsApp (opcional)"
+                ayuda="Solo números, sin espacios ni guiones."
+              >
+                <Entrada
+                  value={telefonoTienda}
+                  onChange={(evento) =>
+                    setTelefonoTienda(limpiarTelefono(evento.target.value))
+                  }
+                  maxLength={13}
+                  inputMode="numeric"
+                  placeholder="04121234567"
+                />
+              </Campo>
+              <div className="space-y-1 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] px-3 py-2.5">
+                <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
+                  <Link2 className="h-3 w-3" />
+                  Enlace público
+                </p>
+                <p className="break-all font-mono text-[11px]">
+                  {urlVisible || "Todavía no publicaste la tienda."}
+                </p>
+                <p className="text-[10px] text-[var(--texto-tenue)]">
+                  Última publicación:{" "}
+                  <strong>
+                    {fechaPublicacionTienda
+                      ? formatearFechaHora(fechaPublicacionTienda)
+                      : "todavía no"}
+                  </strong>
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Boton
+                  onClick={publicarTienda}
+                  cargando={publicandoTienda}
+                  disabled={!slugTienda}
+                >
+                  <Store className="h-4 w-4" />
+                  Publicar cambios
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={renovarLinkTienda}
+                  cargando={renovandoTienda}
+                  disabled={!slugTienda && !ajustes[CLAVES_AJUSTES.TIENDA_SLUG]}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Renovar link
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={copiarLinkTienda}
+                  disabled={!urlVisible}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar link
+                </Boton>
+              </div>
+              <div className="border-t border-[var(--borde)] pt-3">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
+                  Compartir
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => compartirTienda("whatsapp")}
+                    disabled={!urlVisible}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </Boton>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => compartirTienda("facebook")}
+                    disabled={!urlVisible}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    Facebook
+                  </Boton>
+                  <Boton
+                    variante="secundario"
+                    tamano="sm"
+                    onClick={() => compartirTienda("x")}
+                    disabled={!urlVisible}
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    X
+                  </Boton>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-xs font-bold">Productos visibles</h3>
+                <Etiqueta variante="neutra">
+                  {formatearNumero(productosVisibles.length)}
+                </Etiqueta>
+              </div>
+              {productosVisibles.length ? (
+                <div className="space-y-1.5">
+                  {productosVisibles.slice(0, 8).map((producto) => (
+                    <div
+                      key={producto.id}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-[var(--superficie)] px-2.5 py-2 text-[11px]"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{producto.nombre}</span>
+                      <span className="shrink-0 font-semibold">
+                        {formatearVes(producto.precioVentaVes)}
+                      </span>
+                    </div>
+                  ))}
+                  {productosVisibles.length > 8 ? (
+                    <p className="text-[10px] text-[var(--texto-tenue)]">
+                      Y {formatearNumero(productosVisibles.length - 8)} productos más.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-[11px] text-[var(--texto-suave)]">
+                  Marca productos como visibles en la tienda desde el inventario.
+                </p>
+              )}
+            </div>
+          </div>
         </Tarjeta>
 
         <Tarjeta className="p-4 sm:p-5">
@@ -545,23 +1297,46 @@ export default function PaginaConfiguracion() {
             <div>
               <h2 className="text-sm font-bold">Copia de seguridad</h2>
               <p className="text-[11px] text-[var(--texto-suave)]">
-                Descarga un ZIP con Excel y los datos completos.
+                Supabase conserva las últimas 14 copias. También puedes descargar un ZIP.
               </p>
             </div>
           </div>
           <div className="space-y-2">
-            <Boton onClick={descargar} cargando={generando} className="w-full">
-              <CloudDownload className="h-4 w-4" />
-              Descargar respaldo
+            <Boton
+              onClick={crearCopiaNubeAhora}
+              cargando={creandoCopiaNube}
+              className="w-full"
+            >
+              <Cloud className="h-4 w-4" />
+              Crear copia ahora
             </Boton>
             <Boton
               variante="secundario"
-              onClick={() => entradaArchivo.current?.click()}
+              onClick={abrirRestauracionNube}
               className="w-full"
             >
-              <CloudUpload className="h-4 w-4" />
-              Restaurar desde un ZIP
+              <RotateCcw className="h-4 w-4" />
+              Restaurar desde la nube
             </Boton>
+            <div className="grid grid-cols-2 gap-2">
+              <Boton
+                variante="secundario"
+                onClick={descargar}
+                cargando={generando}
+                className="w-full"
+              >
+                <CloudDownload className="h-4 w-4" />
+                ZIP local
+              </Boton>
+              <Boton
+                variante="secundario"
+                onClick={() => entradaArchivo.current?.click()}
+                className="w-full"
+              >
+                <CloudUpload className="h-4 w-4" />
+                Restaurar ZIP
+              </Boton>
+            </div>
             <input
               ref={entradaArchivo}
               type="file"
@@ -570,17 +1345,101 @@ export default function PaginaConfiguracion() {
               onChange={seleccionarRespaldo}
             />
             <Interruptor
-              activo={sincronizacionNube}
-              onCambio={alternarSincronizacionNube}
-              disabled
-              etiqueta="Sincronización con la nube"
-              descripcion="Próximamente. El respaldo opcional en la nube aún no está disponible."
+              activo={copiaNubeActiva}
+              onCambio={alternarCopiaNube}
+              disabled={creandoCopiaNube}
+              etiqueta="Copia automática diaria"
+              descripcion="Se hace al abrir la app o al recuperar internet. Supabase guarda 14 días."
             />
+          </div>
+          <div className="mt-3 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] px-3 py-2.5">
+            <p className="text-[10px] text-[var(--texto-suave)]">
+              Última copia en la nube:{" "}
+              <strong>
+                {fechaUltimaCopiaNube
+                  ? formatearFechaHora(fechaUltimaCopiaNube)
+                  : "todavía no"}
+              </strong>
+            </p>
+            {ultimaCopiaNube ? (
+              <p className="mt-0.5 truncate text-[10px] text-[var(--texto-tenue)]">
+                Archivo: {ultimaCopiaNube}
+              </p>
+            ) : null}
+            {errorCopiaNube ? (
+              <p className="mt-1 text-[10px] text-[var(--peligro)]">{errorCopiaNube}</p>
+            ) : null}
+            {errorNube ? (
+              <p className="mt-1 text-[10px] text-[var(--advertencia)]">{errorNube}</p>
+            ) : null}
           </div>
           <Alerta tipo="advertencia" className="mt-3">
             Restaurar reemplaza el inventario y las ventas de este dispositivo. Haz una
-            copia antes de continuar.
+            copia antes de continuar. La copia automática solo corre con la app abierta.
           </Alerta>
+        </Tarjeta>
+
+        <Tarjeta className="p-4 sm:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--info-suave)] text-[var(--info)]">
+              <HardDrive className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold">Google Drive (opcional)</h2>
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Copia diaria permanente en tu propio Drive.
+              </p>
+            </div>
+          </div>
+          <Alerta tipo="info" titulo="Cómo funcionará">
+            Cuando conectes tu Google Drive, se guardará una copia diaria permanente en tu
+            Drive. Supabase Storage seguirá guardando las últimas 14 copias para
+            restauración rápida.
+          </Alerta>
+          <div className="mt-3 space-y-2">
+            <Boton
+              variante="secundario"
+              onClick={() => setModalDriveAbierto(true)}
+              className="w-full"
+            >
+              <HardDrive className="h-4 w-4" />
+              Conectar Google Drive
+            </Boton>
+            <p className="text-[10px] text-[var(--texto-tenue)]">
+              Próximamente: falta configurar el acceso de Google. Por ahora las copias se
+              guardan en Supabase.
+            </p>
+          </div>
+        </Tarjeta>
+
+        <Tarjeta className="p-4 sm:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
+              <Wifi className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-sm font-bold">Modo sin conexión</h2>
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Deja la app guardada en este dispositivo para abrirla sin internet.
+              </p>
+            </div>
+          </div>
+          <Alerta tipo="info">
+            Después de prepararlo, abre InventaVen desde el acceso directo del navegador.
+            Tus datos siguen guardados localmente en este equipo.
+          </Alerta>
+          <Boton
+            variante="secundario"
+            onClick={prepararModoSinConexion}
+            cargando={preparandoOffline}
+            className="mt-3 w-full"
+          >
+            <Wifi className="h-4 w-4" />
+            Preparar modo sin conexión
+          </Boton>
+          <p className="mt-2 text-[10px] text-[var(--texto-tenue)]">
+            En PC funciona mejor con Chrome o Edge. En teléfonos el soporte puede variar.
+          </p>
         </Tarjeta>
       </div>
 
@@ -668,6 +1527,160 @@ export default function PaginaConfiguracion() {
             <Etiqueta variante="neutra">Inventario.xlsx</Etiqueta>
             <Etiqueta variante="neutra">Ventas.xlsx</Etiqueta>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        abierto={modalNubeAbierto}
+        onCerrar={() => {
+          if (!restaurandoNube) {
+            setModalNubeAbierto(false);
+            setRespaldoNubeSeleccionado(null);
+          }
+        }}
+        titulo={
+          respaldoNubeSeleccionado
+            ? "Restaurar copia de la nube"
+            : "Copias guardadas en la nube"
+        }
+        descripcion={
+          respaldoNubeSeleccionado
+            ? respaldoNubeSeleccionado.nombre
+            : "Supabase conserva las copias de los últimos 14 días."
+        }
+        ancho="md"
+        bloqueado={restaurandoNube}
+        pie={
+          respaldoNubeSeleccionado ? (
+            <>
+              <Boton
+                variante="secundario"
+                onClick={() => setRespaldoNubeSeleccionado(null)}
+                disabled={restaurandoNube}
+              >
+                Cancelar
+              </Boton>
+              <Boton
+                variante="peligro"
+                onClick={confirmarRestauracionNube}
+                cargando={restaurandoNube}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reemplazar mis datos
+              </Boton>
+            </>
+          ) : (
+            <>
+              <Boton
+                variante="secundario"
+                onClick={cargarRespaldosNube}
+                cargando={cargandoNube}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Actualizar
+              </Boton>
+              <Boton
+                variante="secundario"
+                onClick={() => setModalNubeAbierto(false)}
+              >
+                Cerrar
+              </Boton>
+            </>
+          )
+        }
+      >
+        <div className="space-y-3">
+          {errorRestauracionNube ? (
+            <Alerta tipo="error">{errorRestauracionNube}</Alerta>
+          ) : null}
+          {respaldoNubeSeleccionado ? (
+            <Alerta tipo="advertencia" titulo="Se reemplazará todo el contenido actual">
+              Se eliminarán los {formatearNumero(productos)} productos y{" "}
+              {formatearNumero(ventas)} ventas de este dispositivo, y se cargarán los
+              datos de la copia del{" "}
+              {formatearFechaHora(
+                respaldoNubeSeleccionado.fecha ||
+                  respaldoNubeSeleccionado.creadoEn
+              )}
+              .
+            </Alerta>
+          ) : (
+            <>
+              {errorNube ? <Alerta tipo="advertencia">{errorNube}</Alerta> : null}
+              {cargandoNube && !respaldosNube.length ? (
+                <p className="text-xs text-[var(--texto-suave)]">Cargando copias...</p>
+              ) : null}
+              {!cargandoNube && !respaldosNube.length ? (
+                <p className="text-xs text-[var(--texto-suave)]">
+                  Todavía no hay copias en la nube. Activa la copia automática o usa
+                  “Crear copia ahora”.
+                </p>
+              ) : null}
+              <div className="space-y-2">
+                {respaldosNube.map((respaldo) => (
+                  <div
+                    key={respaldo.nombre}
+                    className="flex flex-col gap-2 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold">
+                        {formatearFechaHora(respaldo.fecha || respaldo.creadoEn)}
+                      </p>
+                      <p className="truncate text-[10px] text-[var(--texto-tenue)]">
+                        {respaldo.nombre} · {formatearTamano(respaldo.tamano)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Boton
+                        variante="secundario"
+                        tamano="sm"
+                        onClick={() => descargarCopiaNube(respaldo.nombre)}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Descargar
+                      </Boton>
+                      <Boton
+                        tamano="sm"
+                        onClick={() => setRespaldoNubeSeleccionado(respaldo)}
+                      >
+                        Restaurar
+                      </Boton>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        abierto={modalDriveAbierto}
+        onCerrar={() => setModalDriveAbierto(false)}
+        titulo="Google Drive (próximamente)"
+        descripcion="Copia diaria permanente en tu propio Drive."
+        ancho="sm"
+        pie={
+          <Boton variante="secundario" onClick={() => setModalDriveAbierto(false)}>
+            Entendido
+          </Boton>
+        }
+      >
+        <div className="space-y-3">
+          <Alerta tipo="info">
+            Cuando conectes tu Google Drive, se guardará una copia diaria permanente en tu
+            Drive. Supabase Storage seguirá guardando las últimas 14 copias para
+            restauración rápida.
+          </Alerta>
+          <p className="text-xs text-[var(--texto-suave)]">
+            Para activarlo falta configurar el acceso de Google en este proyecto. Mientras
+            tanto, todas las copias se guardan en Supabase y puedes descargarlas o
+            restaurarlas desde esta pantalla.
+          </p>
+          <p className="text-[10px] text-[var(--texto-tenue)]">
+            Google Drive depende del espacio disponible de tu cuenta. No es almacenamiento
+            ilimitado.
+          </p>
         </div>
       </Modal>
     </div>

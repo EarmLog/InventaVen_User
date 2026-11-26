@@ -8,6 +8,7 @@ import {
   Boxes,
   ChevronRight,
   FileText,
+  HandCoins,
   LayoutDashboard,
   Package,
   ScanBarcode,
@@ -23,6 +24,7 @@ const ENLACES = [
   { href: "/panel", etiqueta: "Panel", Icono: LayoutDashboard },
   { href: "/panel/inventario", etiqueta: "Inventario", Icono: Boxes },
   { href: "/panel/pos", etiqueta: "Punto de venta", Icono: ScanBarcode },
+  { href: "/panel/deudores", etiqueta: "Deudores", Icono: HandCoins },
   { href: "/panel/analisis", etiqueta: "Análisis", Icono: BarChart3 },
   { href: "/panel/fiscal", etiqueta: "Facturación y fiscalidad", Icono: FileText },
   { href: "/panel/proveedores", etiqueta: "Proveedores", Icono: Package },
@@ -39,6 +41,15 @@ function Contenido({ perfil, alNavegar }) {
       () =>
         db
           ? db.ventas.filter(esVentaReportada).count()
+          : 0,
+      [],
+      0
+    ) || 0;
+  const deudasActivas =
+    useLiveQuery(
+      () =>
+        db
+          ? db.deudas.filter((deuda) => deuda.estado !== "pagada").count()
           : 0,
       [],
       0
@@ -71,6 +82,12 @@ function Contenido({ perfil, alNavegar }) {
         {ENLACES.map(({ href, etiqueta, Icono }) => {
           const activo =
             href === "/panel" ? pathname === "/panel" : pathname.startsWith(href);
+          const cantidad =
+            etiqueta === "Pendientes"
+              ? pendientes
+              : etiqueta === "Deudores"
+                ? deudasActivas
+                : 0;
           return (
             <Link
               key={href}
@@ -85,16 +102,18 @@ function Contenido({ perfil, alNavegar }) {
             >
               <Icono className="h-[18px] w-[18px]" />
               <span className="flex-1">{etiqueta}</span>
-              {etiqueta === "Pendientes" && pendientes > 0 ? (
+              {cantidad > 0 ? (
                 <span
                   className={[
                     "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
                     activo
                       ? "bg-white/20 text-white"
-                      : "bg-[var(--advertencia-suave)] text-[var(--advertencia)]",
+                      : etiqueta === "Deudores"
+                        ? "bg-[var(--primario-suave)] text-[var(--primario-fuerte)]"
+                        : "bg-[var(--advertencia-suave)] text-[var(--advertencia)]",
                   ].join(" ")}
                 >
-                  {pendientes}
+                  {cantidad}
                 </span>
               ) : (
                 <ChevronRight

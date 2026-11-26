@@ -6,6 +6,18 @@ export const TIPOS_PAGO = [
   { valor: "tarjeta", etiqueta: "Tarjeta" },
   { valor: "biopago", etiqueta: "Biopago" },
   { valor: "pagomovil", etiqueta: "Pago Móvil" },
+  { valor: "deuda", etiqueta: "Deuda", oculto: true },
+];
+
+export const ORIGENES_DEUDA = [
+  { valor: "fiado", etiqueta: "Fiado" },
+  { valor: "cashea", etiqueta: "Cashea" },
+];
+
+export const ESTADOS_DEUDA = [
+  { valor: "pendiente", etiqueta: "Pendiente" },
+  { valor: "parcial", etiqueta: "Parcial" },
+  { valor: "pagada", etiqueta: "Pagada" },
 ];
 
 export const PORCENTAJE_IVA = 16;
@@ -131,10 +143,28 @@ export const CLAVES_AJUSTES = {
   RIF_NEGOCIO: "rifNegocio",
   ONBOARDING_VISTO: "onboardingVisto",
   SINC_NUBE: "sincronizacionNube",
+  COPIA_NUBE_ACTIVA: "copiaNubeActiva",
+  COPIA_NUBE_ULTIMA: "copiaNubeUltima",
+  COPIA_NUBE_ULTIMA_FECHA: "copiaNubeUltimaFecha",
+  COPIA_NUBE_ULTIMO_ERROR: "copiaNubeUltimoError",
+  COPIA_NUBE_EN_CURSO: "copiaNubeEnCurso",
+  GOOGLE_DRIVE_ACTIVO: "googleDriveActivo",
+  GOOGLE_DRIVE_CUENTA: "googleDriveCuenta",
+  GOOGLE_DRIVE_ULTIMA: "googleDriveUltima",
+  TASA_MANUAL: "tasaManual",
+  METODO_DEUDA_ACTIVO: "metodoDeudaActivo",
+  ACTUALIZAR_SALDOS_DEUDOR_DOLAR: "actualizarSaldosDeudorDolar",
+  COMISION_CASHEA: "comisionCashea",
+  TIENDA_SLUG: "tiendaSlug",
+  TIENDA_TOKEN: "tiendaToken",
+  TIENDA_ACTIVA: "tiendaActiva",
+  TIENDA_TELEFONO: "tiendaTelefono",
+  TIENDA_PUBLICADA_EN: "tiendaPublicadaEn",
 };
 
 export const SECUENCIAS = {
   PRODUCTOS: "productos",
   VENTAS: "ventas",
   FACTURAS: "facturas",
+  DEUDAS: "deudas",
 };

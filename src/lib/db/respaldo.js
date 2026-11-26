@@ -1,7 +1,11 @@
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { db } from "./baseDatos";
-import { SECUENCIAS, NOMBRE_APP } from "@/lib/utilidades/constantes";
+import {
+  CLAVES_AJUSTES,
+  SECUENCIAS,
+  NOMBRE_APP,
+} from "@/lib/utilidades/constantes";
 import { calcularGanancia } from "@/lib/utilidades/precios";
 import { formatearFechaHora, generarId } from "@/lib/utilidades/formato";
 
@@ -130,16 +134,52 @@ function filasAjustes(ajustes) {
   }));
 }
 
+function filasGenericas(registros, campos = []) {
+  return registros.map((registro) => {
+    const fila = {};
+    campos.forEach(({ clave, etiqueta }) => {
+      fila[etiqueta] = registro[clave] ?? "";
+    });
+    fila["Datos JSON"] = JSON.stringify(registro);
+    return fila;
+  });
+}
+
 export async function generarRespaldoZip() {
   if (!db) throw new Error("La base de datos no está disponible.");
-  const [productos, ventas, ajustesFilas, secuencias, movimientos] =
-    await Promise.all([
-      db.productos.toArray(),
-      db.ventas.toArray(),
-      db.ajustes.toArray(),
-      db.secuencias.toArray(),
-      db.movimientos.toArray(),
-    ]);
+  const [
+    productos,
+    ventas,
+    ajustesFilas,
+    secuencias,
+    movimientos,
+    facturasFiscales,
+    auditorias,
+    operacionesEspeciales,
+    proveedores,
+    compras,
+    cajas,
+    clientes,
+    deudas,
+    abonos,
+    imagenesProducto,
+  ] = await Promise.all([
+    db.productos.toArray(),
+    db.ventas.toArray(),
+    db.ajustes.toArray(),
+    db.secuencias.toArray(),
+    db.movimientos.toArray(),
+    db.facturasFiscales.toArray(),
+    db.auditorias.toArray(),
+    db.operacionesEspeciales.toArray(),
+    db.proveedores.toArray(),
+    db.compras.toArray(),
+    db.cajas.toArray(),
+    db.clientes.toArray(),
+    db.deudas.toArray(),
+    db.abonos.toArray(),
+    db.imagenesProducto.toArray(),
+  ]);
   const ajustes = ajustesFilas.reduce((acumulado, fila) => {
     acumulado[fila.clave] = fila.valor;
     return acumulado;
@@ -147,13 +187,23 @@ export async function generarRespaldoZip() {
 
   const datos = {
     app: NOMBRE_APP,
-    version: 1,
+    version: 2,
     exportadoEn: new Date().toISOString(),
     productos,
     ventas,
     ajustes,
     secuencias,
     movimientos,
+    facturasFiscales,
+    auditorias,
+    operacionesEspeciales,
+    proveedores,
+    compras,
+    cajas,
+    clientes,
+    deudas,
+    abonos,
+    imagenesProducto,
   };
 
   const libros = {
@@ -232,6 +282,192 @@ export async function generarRespaldoZip() {
       Ajustes: crearHoja(filasAjustes(ajustes), ["Clave", "Valor"]),
       Secuencias: crearHoja(secuencias, ["nombre", "valor"]),
     }),
+    Movimientos: libroConHojas({
+      Movimientos: crearHoja(
+        filasGenericas(movimientos, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "productoId", etiqueta: "Producto ID" },
+          { clave: "varianteId", etiqueta: "Variante ID" },
+          { clave: "tipo", etiqueta: "Tipo" },
+          { clave: "cantidad", etiqueta: "Cantidad" },
+          { clave: "fecha", etiqueta: "Fecha" },
+        ]),
+        ["ID", "Producto ID", "Variante ID", "Tipo", "Cantidad", "Fecha", "Datos JSON"]
+      ),
+    }),
+    Proveedores: libroConHojas({
+      Proveedores: crearHoja(
+        filasGenericas(proveedores, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "nombre", etiqueta: "Nombre" },
+          { clave: "rif", etiqueta: "RIF" },
+          { clave: "telefono", etiqueta: "Teléfono" },
+          { clave: "email", etiqueta: "Correo" },
+          { clave: "creadoEn", etiqueta: "Creado" },
+        ]),
+        ["ID", "Nombre", "RIF", "Teléfono", "Correo", "Creado", "Datos JSON"]
+      ),
+    }),
+    Compras: libroConHojas({
+      Compras: crearHoja(
+        filasGenericas(compras, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "fecha", etiqueta: "Fecha" },
+          { clave: "tipo", etiqueta: "Tipo" },
+          { clave: "estado", etiqueta: "Estado" },
+          { clave: "productoNombre", etiqueta: "Producto" },
+          { clave: "totalUsd", etiqueta: "Total USD" },
+          { clave: "totalVes", etiqueta: "Total VES" },
+        ]),
+        [
+          "ID",
+          "Fecha",
+          "Tipo",
+          "Estado",
+          "Producto",
+          "Total USD",
+          "Total VES",
+          "Datos JSON",
+        ]
+      ),
+    }),
+    Cajas: libroConHojas({
+      Cajas: crearHoja(
+        filasGenericas(cajas, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "nombre", etiqueta: "Nombre" },
+          { clave: "codigo", etiqueta: "Código" },
+          { clave: "estado", etiqueta: "Estado" },
+          { clave: "fechaCreacion", etiqueta: "Creada" },
+          { clave: "fechaCierre", etiqueta: "Cerrada" },
+        ]),
+        ["ID", "Nombre", "Código", "Estado", "Creada", "Cerrada", "Datos JSON"]
+      ),
+    }),
+    Deudores: libroConHojas({
+      Clientes: crearHoja(
+        filasGenericas(clientes, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "nombre", etiqueta: "Nombre" },
+          { clave: "telefono", etiqueta: "Teléfono" },
+          { clave: "documento", etiqueta: "Documento" },
+          { clave: "direccion", etiqueta: "Dirección" },
+          { clave: "notas", etiqueta: "Notas" },
+        ]),
+        ["ID", "Nombre", "Teléfono", "Documento", "Dirección", "Notas", "Datos JSON"]
+      ),
+      Deudas: crearHoja(
+        filasGenericas(deudas, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "codigo", etiqueta: "Código" },
+          { clave: "clienteId", etiqueta: "Cliente ID" },
+          { clave: "ventaId", etiqueta: "Venta ID" },
+          { clave: "origen", etiqueta: "Origen" },
+          { clave: "estado", etiqueta: "Estado" },
+          { clave: "capitalUsd", etiqueta: "Capital USD" },
+          { clave: "saldoUsd", etiqueta: "Saldo USD" },
+          { clave: "saldoVes", etiqueta: "Saldo VES" },
+          { clave: "comisionCasheaUsd", etiqueta: "Comisión Cashea USD" },
+        ]),
+        [
+          "ID",
+          "Código",
+          "Cliente ID",
+          "Venta ID",
+          "Origen",
+          "Estado",
+          "Capital USD",
+          "Saldo USD",
+          "Saldo VES",
+          "Comisión Cashea USD",
+          "Datos JSON",
+        ]
+      ),
+      Abonos: crearHoja(
+        filasGenericas(abonos, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "deudaId", etiqueta: "Deuda ID" },
+          { clave: "clienteId", etiqueta: "Cliente ID" },
+          { clave: "montoUsd", etiqueta: "Monto USD" },
+          { clave: "montoVes", etiqueta: "Monto VES" },
+          { clave: "metodoPago", etiqueta: "Método de pago" },
+          { clave: "fecha", etiqueta: "Fecha" },
+        ]),
+        [
+          "ID",
+          "Deuda ID",
+          "Cliente ID",
+          "Monto USD",
+          "Monto VES",
+          "Método de pago",
+          "Fecha",
+          "Datos JSON",
+        ]
+      ),
+      Fotos: crearHoja(
+        filasGenericas(imagenesProducto, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "productoId", etiqueta: "Producto ID" },
+          { clave: "mime", etiqueta: "Formato" },
+          { clave: "ancho", etiqueta: "Ancho" },
+          { clave: "alto", etiqueta: "Alto" },
+        ]),
+        ["ID", "Producto ID", "Formato", "Ancho", "Alto", "Datos JSON"]
+      ),
+    }),
+    Fiscal: libroConHojas({
+      Facturas: crearHoja(
+        filasGenericas(facturasFiscales, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "ventaId", etiqueta: "Venta ID" },
+          { clave: "tipo", etiqueta: "Tipo" },
+          { clave: "estado", etiqueta: "Estado" },
+          { clave: "fecha", etiqueta: "Fecha" },
+          { clave: "totalUsd", etiqueta: "Total USD" },
+        ]),
+        ["ID", "Venta ID", "Tipo", "Estado", "Fecha", "Total USD", "Datos JSON"]
+      ),
+    }),
+    Auditoria: libroConHojas({
+      Auditorias: crearHoja(
+        filasGenericas(auditorias, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "usuarioId", etiqueta: "Usuario ID" },
+          { clave: "accion", etiqueta: "Acción" },
+          { clave: "entidad", etiqueta: "Entidad" },
+          { clave: "entidadId", etiqueta: "Entidad ID" },
+          { clave: "fecha", etiqueta: "Fecha" },
+        ]),
+        [
+          "ID",
+          "Usuario ID",
+          "Acción",
+          "Entidad",
+          "Entidad ID",
+          "Fecha",
+          "Datos JSON",
+        ]
+      ),
+      "Operaciones especiales": crearHoja(
+        filasGenericas(operacionesEspeciales, [
+          { clave: "id", etiqueta: "ID" },
+          { clave: "tipo", etiqueta: "Tipo" },
+          { clave: "entidadId", etiqueta: "Entidad ID" },
+          { clave: "entidadTipo", etiqueta: "Entidad tipo" },
+          { clave: "fecha", etiqueta: "Fecha" },
+          { clave: "estado", etiqueta: "Estado" },
+        ]),
+        [
+          "ID",
+          "Tipo",
+          "Entidad ID",
+          "Entidad tipo",
+          "Fecha",
+          "Estado",
+          "Datos JSON",
+        ]
+      ),
+    }),
   };
 
   const zip = new JSZip();
@@ -250,7 +486,11 @@ export async function generarRespaldoZip() {
       "- respaldo.json: datos completos usados para restaurar con exactitud.",
       "- Inventario.xlsx: productos y variantes para revisión humana.",
       "- Ventas.xlsx: ventas y detalle de cada factura.",
-      "- Configuracion.xlsx: ajustes y correlativos.",
+      "- Configuracion.xlsx: ajustes, correlativos y movimientos.",
+      "- Proveedores.xlsx, Compras.xlsx y Cajas.xlsx.",
+      "- Deudores.xlsx: clientes, deudas, abonos y fotos de productos.",
+      "- Fiscal.xlsx: facturas fiscales.",
+      "- Auditoria.xlsx: auditorías y operaciones especiales.",
       "",
       "Puedes restaurar este ZIP desde Configuración > Copia de seguridad.",
     ].join("\n")
@@ -285,12 +525,23 @@ async function cargarDatosDesdeZip(zip) {
   if (entradaJson) {
     const contenido = await entradaJson.async("string");
     const datos = JSON.parse(contenido);
+    const arreglo = (valor) => (Array.isArray(valor) ? valor : []);
     return {
-      productos: Array.isArray(datos.productos) ? datos.productos : [],
-      ventas: Array.isArray(datos.ventas) ? datos.ventas : [],
+      productos: arreglo(datos.productos),
+      ventas: arreglo(datos.ventas),
       ajustes: datos.ajustes && typeof datos.ajustes === "object" ? datos.ajustes : {},
-      secuencias: Array.isArray(datos.secuencias) ? datos.secuencias : [],
-      movimientos: Array.isArray(datos.movimientos) ? datos.movimientos : [],
+      secuencias: arreglo(datos.secuencias),
+      movimientos: arreglo(datos.movimientos),
+      facturasFiscales: arreglo(datos.facturasFiscales),
+      auditorias: arreglo(datos.auditorias),
+      operacionesEspeciales: arreglo(datos.operacionesEspeciales),
+      proveedores: arreglo(datos.proveedores),
+      compras: arreglo(datos.compras),
+      cajas: arreglo(datos.cajas),
+      clientes: arreglo(datos.clientes),
+      deudas: arreglo(datos.deudas),
+      abonos: arreglo(datos.abonos),
+      imagenesProducto: arreglo(datos.imagenesProducto),
     };
   }
 
@@ -331,10 +582,20 @@ async function cargarDatosDesdeZip(zip) {
     ajustes: {},
     secuencias: [],
     movimientos: [],
+    facturasFiscales: [],
+    auditorias: [],
+    operacionesEspeciales: [],
+    proveedores: [],
+    compras: [],
+    cajas: [],
+    clientes: [],
+    deudas: [],
+    abonos: [],
+    imagenesProducto: [],
   };
 }
 
-function maximaSecuenciaDesdeDatos(productos, ventas, nombre) {
+function maximaSecuenciaDesdeDatos(productos, ventas, nombre, deudas = []) {
   if (nombre === SECUENCIAS.PRODUCTOS) {
     return productos.reduce((maximo, producto) => {
       const coincidencia = String(producto.sku || "").match(/-(\d{3,})(?:-|$)/);
@@ -347,11 +608,43 @@ function maximaSecuenciaDesdeDatos(productos, ventas, nombre) {
       return Math.max(maximo, coincidencia ? Number(coincidencia[1]) : 0);
     }, 0);
   }
+  if (nombre === SECUENCIAS.DEUDAS) {
+    return deudas.reduce((maximo, deuda) => {
+      const coincidencia = String(deuda.codigo || "").match(/(\d+)$/);
+      return Math.max(maximo, coincidencia ? Number(coincidencia[1]) : 0);
+    }, 0);
+  }
   return ventas.reduce((maximo, venta) => {
     const coincidencia = String(venta.numeroFactura || "").match(/(\d+)$/);
     return Math.max(maximo, coincidencia ? Number(coincidencia[1]) : 0);
   }, 0);
 }
+
+const AJUSTES_OPERATIVOS_PRESERVADOS = [
+  CLAVES_AJUSTES.COPIA_NUBE_ACTIVA,
+  CLAVES_AJUSTES.COPIA_NUBE_ULTIMA,
+  CLAVES_AJUSTES.COPIA_NUBE_ULTIMA_FECHA,
+  CLAVES_AJUSTES.COPIA_NUBE_ULTIMO_ERROR,
+  CLAVES_AJUSTES.COPIA_NUBE_EN_CURSO,
+  CLAVES_AJUSTES.GOOGLE_DRIVE_ACTIVO,
+  CLAVES_AJUSTES.GOOGLE_DRIVE_CUENTA,
+  CLAVES_AJUSTES.GOOGLE_DRIVE_ULTIMA,
+  CLAVES_AJUSTES.TASA_USD,
+  CLAVES_AJUSTES.TASA_ACTUALIZADA_EN,
+  CLAVES_AJUSTES.TASA_ULTIMA_APLICADA,
+  CLAVES_AJUSTES.TASA_MANUAL,
+  CLAVES_AJUSTES.NOMBRE_NEGOCIO,
+  CLAVES_AJUSTES.RIF_NEGOCIO,
+  CLAVES_AJUSTES.ONBOARDING_VISTO,
+  CLAVES_AJUSTES.METODO_DEUDA_ACTIVO,
+  CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR,
+  CLAVES_AJUSTES.COMISION_CASHEA,
+  CLAVES_AJUSTES.TIENDA_SLUG,
+  CLAVES_AJUSTES.TIENDA_TOKEN,
+  CLAVES_AJUSTES.TIENDA_ACTIVA,
+  CLAVES_AJUSTES.TIENDA_TELEFONO,
+  CLAVES_AJUSTES.TIENDA_PUBLICADA_EN,
+];
 
 export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
   if (!db) throw new Error("La base de datos no está disponible.");
@@ -359,11 +652,31 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
   const zip = await JSZip.loadAsync(await archivo.arrayBuffer());
   const datos = await cargarDatosDesdeZip(zip);
 
-  if (!datos.productos.length && !datos.ventas.length) {
-    throw new Error("El respaldo no contiene productos ni ventas para restaurar.");
+  const totalRegistros = [
+    datos.productos,
+    datos.ventas,
+    datos.movimientos,
+    datos.facturasFiscales,
+    datos.auditorias,
+    datos.operacionesEspeciales,
+    datos.proveedores,
+    datos.compras,
+    datos.cajas,
+    datos.clientes,
+    datos.deudas,
+    datos.abonos,
+    datos.imagenesProducto,
+  ].reduce((total, lista) => total + lista.length, 0);
+
+  if (totalRegistros === 0 && Object.keys(datos.ajustes || {}).length === 0) {
+    throw new Error("El respaldo no contiene datos para restaurar.");
   }
 
   const ahora = new Date().toISOString();
+  const ajustesPreservados = reemplazar
+    ? (await db.ajustes.bulkGet(AJUSTES_OPERATIVOS_PRESERVADOS)).filter(Boolean)
+    : [];
+
   await db.transaction(
     "rw",
     db.productos,
@@ -371,6 +684,16 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
     db.ajustes,
     db.secuencias,
     db.movimientos,
+    db.facturasFiscales,
+    db.auditorias,
+    db.operacionesEspeciales,
+    db.proveedores,
+    db.compras,
+    db.cajas,
+    db.clientes,
+    db.deudas,
+    db.abonos,
+    db.imagenesProducto,
     async () => {
       if (reemplazar) {
         await Promise.all([
@@ -379,18 +702,48 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
           db.ajustes.clear(),
           db.secuencias.clear(),
           db.movimientos.clear(),
+          db.facturasFiscales.clear(),
+          db.auditorias.clear(),
+          db.operacionesEspeciales.clear(),
+          db.proveedores.clear(),
+          db.compras.clear(),
+          db.cajas.clear(),
+          db.clientes.clear(),
+          db.deudas.clear(),
+          db.abonos.clear(),
+          db.imagenesProducto.clear(),
         ]);
       }
 
       if (datos.productos.length) await db.productos.bulkPut(datos.productos);
       if (datos.ventas.length) await db.ventas.bulkPut(datos.ventas);
       if (datos.movimientos.length) await db.movimientos.bulkPut(datos.movimientos);
+      if (datos.facturasFiscales.length) {
+        await db.facturasFiscales.bulkPut(datos.facturasFiscales);
+      }
+      if (datos.auditorias.length) await db.auditorias.bulkPut(datos.auditorias);
+      if (datos.operacionesEspeciales.length) {
+        await db.operacionesEspeciales.bulkPut(datos.operacionesEspeciales);
+      }
+      if (datos.proveedores.length) await db.proveedores.bulkPut(datos.proveedores);
+      if (datos.compras.length) await db.compras.bulkPut(datos.compras);
+      if (datos.cajas.length) await db.cajas.bulkPut(datos.cajas);
+      if (datos.clientes.length) await db.clientes.bulkPut(datos.clientes);
+      if (datos.deudas.length) await db.deudas.bulkPut(datos.deudas);
+      if (datos.abonos.length) await db.abonos.bulkPut(datos.abonos);
+      if (datos.imagenesProducto.length) {
+        await db.imagenesProducto.bulkPut(datos.imagenesProducto);
+      }
 
       const ajustes = Object.entries(datos.ajustes || {}).map(([clave, valor]) => ({
         clave,
         valor,
       }));
       if (ajustes.length) await db.ajustes.bulkPut(ajustes);
+
+      if (ajustesPreservados.length) {
+        await db.ajustes.bulkPut(ajustesPreservados);
+      }
 
       const secuenciasGuardadas = new Map(
         (datos.secuencias || []).map((secuencia) => [secuencia.nombre, secuencia.valor])
@@ -399,7 +752,8 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
         const calculada = maximaSecuenciaDesdeDatos(
           datos.productos,
           datos.ventas,
-          nombre
+          nombre,
+          datos.deudas
         );
         const guardada = Number(secuenciasGuardadas.get(nombre) || 0);
         await db.secuencias.put({
@@ -419,6 +773,16 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
     productos: datos.productos.length,
     ventas: datos.ventas.length,
     movimientos: datos.movimientos.length,
+    facturasFiscales: datos.facturasFiscales.length,
+    auditorias: datos.auditorias.length,
+    operacionesEspeciales: datos.operacionesEspeciales.length,
+    proveedores: datos.proveedores.length,
+    compras: datos.compras.length,
+    cajas: datos.cajas.length,
+    clientes: datos.clientes.length,
+    deudas: datos.deudas.length,
+    abonos: datos.abonos.length,
+    imagenesProducto: datos.imagenesProducto.length,
   };
 }
 

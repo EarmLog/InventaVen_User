@@ -5,7 +5,8 @@ export function esVentaEnAnalisis(venta) {
     Boolean(venta) &&
     venta.estado !== "reportada" &&
     venta.estado !== "cancelada" &&
-    venta.estado !== "eliminada"
+    venta.estado !== "eliminada" &&
+    !venta.esCredito
   );
 }
 

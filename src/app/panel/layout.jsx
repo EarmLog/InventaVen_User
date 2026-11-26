@@ -9,14 +9,18 @@ import { useSesion } from "@/context/SesionContext";
 import BarraLateral from "@/components/layout/BarraLateral";
 import BarraSuperior from "@/components/layout/BarraSuperior";
 import ModalBienvenida from "@/components/modules/onboarding/ModalBienvenida";
+import IndicadorConexion from "@/components/ui/IndicadorConexion";
 import { asegurarDatosIniciales, configurarBaseDatosUsuario } from "@/lib/db/baseDatos";
+import { ejecutarCopiaAutomatica } from "@/lib/db/copiaAutomatica";
 import {
   actualizarPreciosPorTasa,
+  actualizarSaldosDeudoresPorTasa,
   guardarAjuste,
   obtenerAjustes,
 } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 import { formatearVes } from "@/lib/utilidades/formato";
+import { tasaBajoSospechosa, tasaEsValida } from "@/lib/utilidades/tasa";
 
 function PantallaCargando({ texto = "Preparando tu panel..." }) {
   return (
@@ -45,9 +49,15 @@ function ContenidoPanel({ children }) {
   }, [sesion, router]);
 
   useEffect(() => {
-    if (!sesion) return;
+    if (!sesion) return undefined;
+    let activo = true;
+    let intervalo = null;
+    let manejarOnline = null;
+    let manejarVisibilidad = null;
     const userId = sesion.user?.id || "public";
+
     configurarBaseDatosUsuario(userId).then(() => {
+      if (!activo) return;
       asegurarDatosIniciales().catch(() => null);
       refrescarPerfil();
       if (sesion.user?.email === "demo.inventaven2026@gmail.com") {
@@ -55,7 +65,28 @@ function ContenidoPanel({ children }) {
           sembrarDatosDemo().catch(() => null);
         });
       }
+
+      const ejecutarCopia = () => {
+        ejecutarCopiaAutomatica().catch(() => null);
+      };
+      manejarOnline = ejecutarCopia;
+      manejarVisibilidad = () => {
+        if (document.visibilityState === "visible") ejecutarCopia();
+      };
+      window.addEventListener("online", manejarOnline);
+      document.addEventListener("visibilitychange", manejarVisibilidad);
+      intervalo = window.setInterval(ejecutarCopia, 60 * 60 * 1000);
+      ejecutarCopia();
     });
+
+    return () => {
+      activo = false;
+      if (manejarOnline) window.removeEventListener("online", manejarOnline);
+      if (manejarVisibilidad) {
+        document.removeEventListener("visibilitychange", manejarVisibilidad);
+      }
+      if (intervalo) window.clearInterval(intervalo);
+    };
   }, [sesion, refrescarPerfil]);
 
   useEffect(() => {
@@ -99,7 +130,17 @@ function ContenidoPanel({ children }) {
 
   useEffect(() => {
     if (!autoPrecios || !tasa || !sesion) return;
+    if (!tasaEsValida(tasa)) return;
     if (ultimaTasaAplicada !== null && Math.abs(ultimaTasaAplicada - tasa) < 0.0001) return;
+    if (
+      ultimaTasaAplicada !== null &&
+      tasaBajoSospechosa(tasa, ultimaTasaAplicada)
+    ) {
+      toast.warning(
+        "La tasa bajó 10% o más. No se actualizaron los precios automáticamente para protegerlos."
+      );
+      return;
+    }
     let cancelado = false;
     (async () => {
       try {
@@ -118,6 +159,11 @@ function ContenidoPanel({ children }) {
       cancelado = true;
     };
   }, [autoPrecios, tasa, sesion]);
+
+  useEffect(() => {
+    if (!sesion || !tasa || Number(tasa) <= 0) return;
+    actualizarSaldosDeudoresPorTasa(tasa).catch(() => null);
+  }, [tasa, sesion]);
 
   if (sesion === undefined) return <PantallaCargando />;
   if (sesion === null) return <PantallaCargando texto="Redirigiendo al inicio de sesión..." />;
@@ -149,6 +195,7 @@ function ContenidoPanel({ children }) {
         </footer>
       </div>
       <ModalBienvenida abierto={onboardingAbierto} onCerrar={cerrarOnboarding} />
+      <IndicadorConexion />
     </div>
   );
 }

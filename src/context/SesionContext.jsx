@@ -13,6 +13,52 @@ import { solicitarPerfil, traducirErrorAuth } from "@/lib/api/auth";
 import { componerNombreNegocio } from "@/lib/seguridad/validaciones";
 
 const SesionContext = createContext(null);
+const CLAVE_SESION_OFFLINE = "inventaven-sesion-offline";
+
+function leerSesionOffline() {
+  if (typeof window === "undefined") return null;
+  try {
+    const contenido = window.localStorage.getItem(CLAVE_SESION_OFFLINE);
+    if (!contenido) return null;
+    const datos = JSON.parse(contenido);
+    if (!datos?.sesion?.user?.id) return null;
+    return datos;
+  } catch {
+    return null;
+  }
+}
+
+function guardarSesionOffline(sesionActual, perfilActual) {
+  if (typeof window === "undefined") return;
+  const usuario = sesionActual?.user;
+  if (!usuario?.id) return;
+  try {
+    window.localStorage.setItem(
+      CLAVE_SESION_OFFLINE,
+      JSON.stringify({
+        version: 1,
+        guardadoEn: new Date().toISOString(),
+        sesion: {
+          user: {
+            id: usuario.id,
+            email: usuario.email || perfilActual?.correo || "",
+          },
+        },
+        perfil: perfilActual || null,
+      })
+    );
+  } catch {
+    // Sin espacio o almacenamiento bloqueado: la app sigue con la sesión en memoria.
+  }
+}
+
+function limpiarSesionOffline() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(CLAVE_SESION_OFFLINE);
+  } catch {
+  }
+}
 
 export function ProveedorSesion({ children }) {
   const [sesion, setSesion] = useState(undefined);
@@ -22,6 +68,7 @@ export function ProveedorSesion({ children }) {
   const montado = useRef(true);
   const perfilEnCurso = useRef(false);
   const perfilRef = useRef(null);
+  const cerrandoSesion = useRef(false);
 
   const cargarPerfil = useCallback(async (sesionActual) => {
     if (!sesionActual?.access_token) {
@@ -38,6 +85,7 @@ export function ProveedorSesion({ children }) {
     try {
       const datos = await solicitarPerfil(sesionActual.access_token);
       perfilRef.current = datos;
+      guardarSesionOffline(sesionActual, datos);
       if (montado.current) setPerfil(datos);
       return datos;
     } catch (error) {
@@ -54,22 +102,47 @@ export function ProveedorSesion({ children }) {
   useEffect(() => {
     montado.current = true;
     const supabase = obtenerClienteSupabase();
+    const sesionGuardada = leerSesionOffline();
+
+    if (sesionGuardada) {
+      perfilRef.current = sesionGuardada.perfil || null;
+      setSesion(sesionGuardada.sesion);
+      setPerfil(sesionGuardada.perfil || null);
+      setCargandoPerfil(false);
+    }
 
     supabase.auth
       .getSession()
       .then(({ data }) => {
         if (!montado.current) return;
-        setSesion(data.session ?? null);
         if (data.session) {
+          setSesion(data.session);
           cargarPerfil(data.session);
-        } else {
-          perfilRef.current = null;
-          setPerfil(null);
-          setCargandoPerfil(false);
+          return;
         }
+        const respaldo = leerSesionOffline();
+        if (respaldo) {
+          perfilRef.current = respaldo.perfil || null;
+          setSesion(respaldo.sesion);
+          setPerfil(respaldo.perfil || null);
+          setCargandoPerfil(false);
+          return;
+        }
+        perfilRef.current = null;
+        setSesion(null);
+        setPerfil(null);
+        setCargandoPerfil(false);
       })
       .catch(() => {
         if (!montado.current) return;
+        const respaldo = leerSesionOffline();
+        if (respaldo) {
+          perfilRef.current = respaldo.perfil || null;
+          setSesion(respaldo.sesion);
+          setPerfil(respaldo.perfil || null);
+          setCargandoPerfil(false);
+          return;
+        }
         perfilRef.current = null;
         setSesion(null);
         setPerfil(null);
@@ -78,14 +151,34 @@ export function ProveedorSesion({ children }) {
 
     const { data: escucha } = supabase.auth.onAuthStateChange((evento, nuevaSesion) => {
       if (!montado.current) return;
-      setSesion(nuevaSesion ?? null);
       if (nuevaSesion) {
-        if (evento !== "TOKEN_REFRESHED") cargarPerfil(nuevaSesion);
-      } else {
-        perfilRef.current = null;
-        setPerfil(null);
-        setCargandoPerfil(false);
+        setSesion(nuevaSesion);
+        if (evento !== "TOKEN_REFRESHED") {
+          cargarPerfil(nuevaSesion);
+        } else {
+          guardarSesionOffline(nuevaSesion, perfilRef.current);
+        }
+        return;
       }
+
+      if (evento === "SIGNED_OUT") {
+        const respaldo = leerSesionOffline();
+        const sinConexion =
+          typeof navigator !== "undefined" && navigator.onLine === false;
+        if (!cerrandoSesion.current && sinConexion && respaldo) {
+          perfilRef.current = respaldo.perfil || null;
+          setSesion(respaldo.sesion);
+          setPerfil(respaldo.perfil || null);
+          setCargandoPerfil(false);
+          return;
+        }
+        limpiarSesionOffline();
+      }
+
+      perfilRef.current = null;
+      setSesion(null);
+      setPerfil(null);
+      setCargandoPerfil(false);
     });
 
     return () => {
@@ -189,12 +282,19 @@ export function ProveedorSesion({ children }) {
   }, []);
 
   const cerrarSesion = useCallback(async () => {
-    const supabase = obtenerClienteSupabase();
-    await supabase.auth.signOut();
-    perfilRef.current = null;
-    setPerfil(null);
-    setSesion(null);
-    setCargandoPerfil(false);
+    cerrandoSesion.current = true;
+    limpiarSesionOffline();
+    try {
+      const supabase = obtenerClienteSupabase();
+      await supabase.auth.signOut();
+    } catch {
+    } finally {
+      perfilRef.current = null;
+      setPerfil(null);
+      setSesion(null);
+      setCargandoPerfil(false);
+      cerrandoSesion.current = false;
+    }
   }, []);
 
   const recuperarClave = useCallback(async (correo) => {
@@ -225,6 +325,7 @@ export function ProveedorSesion({ children }) {
         datos
       );
       perfilRef.current = actualizado;
+      guardarSesionOffline(data.session, actualizado);
       setPerfil(actualizado);
       return actualizado;
     },

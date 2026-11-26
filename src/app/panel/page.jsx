@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -15,6 +16,7 @@ import {
   ScanBarcode,
   ShoppingCart,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
 import { useSesion } from "@/context/SesionContext";
@@ -23,7 +25,10 @@ import Tarjeta from "@/components/ui/Tarjeta";
 import Etiqueta from "@/components/ui/Etiqueta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 import FiltroFechas from "@/components/ui/FiltroFechas";
+import ModalDetalleIndicador from "@/components/modules/panel/ModalDetalleIndicador";
 import { GraficoVentasDias } from "@/components/modules/analisis/Graficos";
+import { calcularTotales } from "@/lib/utilidades/analisis";
+import { obtenerResumenDeudores } from "@/lib/db/repositorios";
 import {
   agruparVentasPorRango,
   fechaParaInput,
@@ -39,7 +44,14 @@ import {
 import { TIPOS_PAGO } from "@/lib/utilidades/constantes";
 import { esVentaEnAnalisis } from "@/lib/utilidades/ventas";
 
-function TarjetaIndicador({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
+function TarjetaIndicador({
+  Icono,
+  etiqueta,
+  valor,
+  detalle,
+  tono = "verde",
+  onClick,
+}) {
   const tonos = {
     verde: "bg-[var(--primario-suave)] text-[var(--primario-fuerte)]",
     azul: "bg-[var(--info-suave)] text-[var(--info)]",
@@ -47,7 +59,13 @@ function TarjetaIndicador({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
     violeta: "bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300",
   };
   return (
-    <Tarjeta className="relative overflow-hidden p-4">
+    <Tarjeta
+      as="button"
+      type="button"
+      onClick={onClick}
+      title={`Ver detalle de ${etiqueta}`}
+      className="group relative w-full overflow-hidden p-4 text-left transition hover:border-[var(--primario)]/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primario)]/40"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
@@ -57,6 +75,12 @@ function TarjetaIndicador({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
             {valor}
           </p>
           <p className="mt-1 truncate text-[11px] text-[var(--texto-tenue)]">{detalle}</p>
+          {onClick ? (
+            <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-[var(--texto-tenue)] transition group-hover:text-[var(--primario)]">
+              Ver detalle
+              <ArrowRight className="h-3 w-3" />
+            </p>
+          ) : null}
         </div>
         <span
           className={[
@@ -72,40 +96,44 @@ function TarjetaIndicador({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
 }
 
 export default function PaginaPanel() {
+  const router = useRouter();
   const { perfil } = useSesion();
   const { tasa } = useTasa();
   const productos =
     useLiveQuery(() => (db ? db.productos.toArray() : []), [], []) || [];
   const ventas = useLiveQuery(() => (db ? db.ventas.toArray() : []), [], []) || [];
+  const resumenDeudores =
+    useLiveQuery(() => obtenerResumenDeudores(), [], []) || [];
   const [desde, setDesde] = useState(() =>
     fechaParaInput(sumarDias(new Date(), -6))
   );
   const [hasta, setHasta] = useState(() => fechaParaInput(new Date()));
+  const [indicador, setIndicador] = useState(null);
 
   const ventasValidas = useMemo(
-    () => ventas.filter(esVentaEnAnalisis),
+    () => ventas.filter((venta) => esVentaEnAnalisis(venta) && !venta.esCredito),
     [ventas]
   );
   const hoy = fechaParaInput(new Date());
   const ventasHoy = ventasValidas.filter(
     (venta) => fechaParaInput(venta.fecha) === hoy
   );
-  const totalHoyUsd = redondear(
-    ventasHoy.reduce((total, venta) => total + Number(venta.totalUsd || 0), 0)
-  );
-  const totalHoyVes = redondear(
-    ventasHoy.reduce((total, venta) => total + Number(venta.totalVes || 0), 0)
-  );
-  const gananciaHoyVes = redondear(
-    ventasHoy.reduce(
-      (total, venta) =>
-        total + Number(venta.gananciaUsd || 0) * Number(venta.tasaUsd || 0),
-      0
-    )
-  );
+  const resumenHoy = calcularTotales(ventasHoy);
+  const totalHoyUsd = resumenHoy.totalUsd;
+  const totalHoyVes = resumenHoy.totalVes;
+  const gananciaHoyVes = resumenHoy.gananciaVes;
   const productosActivos = productos.filter((producto) => producto.activo !== false);
   const stockBajo = productosActivos.filter(
     (producto) => Number(producto.stock) <= Number(producto.stockMinimo || 0)
+  );
+  const deudoresConSaldo = resumenDeudores.filter(
+    (deudor) => Number(deudor.saldoUsd) > 0 || Number(deudor.saldoVes) > 0
+  );
+  const saldoDeudoresVes = redondear(
+    deudoresConSaldo.reduce((total, deudor) => total + Number(deudor.saldoVes || 0), 0)
+  );
+  const saldoDeudoresUsd = redondear(
+    deudoresConSaldo.reduce((total, deudor) => total + Number(deudor.saldoUsd || 0), 0)
   );
 
   const ventasPeriodo = useMemo(
@@ -179,12 +207,13 @@ export default function PaginaPanel() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <TarjetaIndicador
           Icono={CircleDollarSign}
           etiqueta="Ventas de hoy"
           valor={formatearVes(totalHoyVes)}
           detalle={`${ventasHoy.length} venta${ventasHoy.length === 1 ? "" : "s"} · ${formatearUsd(totalHoyUsd)}`}
+          onClick={() => setIndicador("ventas")}
         />
         <TarjetaIndicador
           Icono={TrendingUp}
@@ -196,6 +225,7 @@ export default function PaginaPanel() {
               : "Aún sin ventas hoy"
           }
           tono="azul"
+          onClick={() => setIndicador("ganancia")}
         />
         <TarjetaIndicador
           Icono={Boxes}
@@ -203,6 +233,7 @@ export default function PaginaPanel() {
           valor={formatearNumero(productosActivos.length)}
           detalle={`${productos.reduce((total, producto) => total + (producto.variantes?.length || 0), 0)} variantes registradas`}
           tono="violeta"
+          onClick={() => setIndicador("productos")}
         />
         <TarjetaIndicador
           Icono={AlertTriangle}
@@ -214,6 +245,23 @@ export default function PaginaPanel() {
               : "Todo tu inventario está saludable"
           }
           tono={stockBajo.length ? "ambar" : "verde"}
+          onClick={() => setIndicador("stock")}
+        />
+        <TarjetaIndicador
+          Icono={Users}
+          etiqueta="Deudores"
+          valor={
+            deudoresConSaldo.length
+              ? formatearVes(saldoDeudoresVes)
+              : "Sin deudas pendientes"
+          }
+          detalle={
+            deudoresConSaldo.length
+              ? `${deudoresConSaldo.length} deudor${deudoresConSaldo.length === 1 ? "" : "es"} · ${formatearUsd(saldoDeudoresUsd)}`
+              : "Abre Deudores para ver el detalle"
+          }
+          tono="ambar"
+          onClick={() => router.push("/panel/deudores")}
         />
       </div>
 
@@ -402,6 +450,14 @@ export default function PaginaPanel() {
           )}
         </Tarjeta>
       </div>
+
+      <ModalDetalleIndicador
+        abierto={Boolean(indicador)}
+        tipo={indicador || "ventas"}
+        onCerrar={() => setIndicador(null)}
+        ventas={ventasHoy}
+        productos={productos}
+      />
     </div>
   );
 }

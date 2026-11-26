@@ -1,9 +1,14 @@
 "use client";
 
-export default function Tarjeta({ children, className = "", ...props }) {
+export default function Tarjeta({
+  children,
+  className = "",
+  as: Componente = "section",
+  ...props
+}) {
   return (
-    <section className={["tarjeta p-5", className].join(" ")} {...props}>
+    <Componente className={["tarjeta p-5", className].join(" ")} {...props}>
       {children}
-    </section>
+    </Componente>
   );
 }

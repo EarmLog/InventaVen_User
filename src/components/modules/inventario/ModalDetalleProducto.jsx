@@ -1,6 +1,8 @@
 "use client";
 
+import { useLiveQuery } from "dexie-react-hooks";
 import { Boxes, Pencil, PackagePlus } from "lucide-react";
+import { db } from "@/lib/db/baseDatos";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
 import Etiqueta from "@/components/ui/Etiqueta";
@@ -24,6 +26,15 @@ export default function ModalDetalleProducto({
   onEditar,
   onRenovar,
 }) {
+  const imagen = useLiveQuery(
+    () =>
+      db && producto?.id
+        ? db.imagenesProducto.where("productoId").equals(producto.id).first()
+        : null,
+    [producto?.id],
+    null
+  );
+
   if (!producto) return null;
   const ganancia = calcularGanancia(
     producto.precioCompraUsd,
@@ -55,9 +66,22 @@ export default function ModalDetalleProducto({
       }
     >
       <div className="space-y-4">
+        {imagen?.datos ? (
+          <div className="overflow-hidden rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] sm:max-w-sm">
+            <img
+              src={imagen.datos}
+              alt={`Foto de ${producto.nombre}`}
+              className="h-44 w-full object-cover"
+            />
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-2">
           <Etiqueta variante={producto.activo === false ? "peligro" : "exito"}>
             {producto.activo === false ? "Inactivo" : "Activo"}
+          </Etiqueta>
+          <Etiqueta variante={producto.visibleTienda ? "exito" : "neutra"}>
+            {producto.visibleTienda ? "Visible en tienda virtual" : "No visible"}
           </Etiqueta>
           {producto.ofertaActiva ? (
             <Etiqueta variante="advertencia">

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { guardarAjustes, obtenerAjustes } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
+import { evaluarTasa } from "@/lib/utilidades/tasa";
 
 const TasaContext = createContext(null);
 
@@ -24,11 +25,23 @@ export function ProveedorTasa({ children }) {
   const cargarTasa = useCallback(async (silencioso = false) => {
     if (!silencioso && montado.current) setCargandoTasa(true);
     try {
+      const ajustes = await obtenerAjustes();
+      const guardada = Number(ajustes[CLAVES_AJUSTES.TASA_USD]) || 0;
       const respuesta = await fetch("/api/tasa-cambio", { cache: "no-store" });
       const datos = await respuesta.json();
       if (!respuesta.ok) throw new Error(datos.error || "Sin tasa disponible.");
       const nueva = Number(datos.tasa) || 0;
-      if (nueva <= 0) throw new Error("La tasa recibida no es válida.");
+      const evaluacion = evaluarTasa(nueva, guardada);
+      if (!evaluacion.valida) {
+        if (!montado.current) return;
+        if (guardada > 0) {
+          setTasa(guardada);
+          setFechaTasa(ajustes[CLAVES_AJUSTES.TASA_ACTUALIZADA_EN] || null);
+          setFuente("tasa guardada");
+        }
+        setErrorTasa(evaluacion.motivo);
+        return;
+      }
       if (!montado.current) return;
       setTasa(nueva);
       setFechaTasa(datos.fecha || new Date().toISOString());
@@ -38,6 +51,7 @@ export function ProveedorTasa({ children }) {
         await guardarAjustes({
           [CLAVES_AJUSTES.TASA_USD]: nueva,
           [CLAVES_AJUSTES.TASA_ACTUALIZADA_EN]: new Date().toISOString(),
+          [CLAVES_AJUSTES.TASA_MANUAL]: false,
         });
       } catch {
         // La tasa se conserva en memoria aunque no se pueda persistir.
@@ -46,7 +60,7 @@ export function ProveedorTasa({ children }) {
       if (!montado.current) return;
       const ajustes = await obtenerAjustes();
       const guardada = Number(ajustes[CLAVES_AJUSTES.TASA_USD]) || 0;
-      if (guardada > 0 && !silencioso) {
+      if (guardada > 0) {
         setTasa(guardada);
         setFechaTasa(ajustes[CLAVES_AJUSTES.TASA_ACTUALIZADA_EN] || null);
         setFuente("tasa guardada");
@@ -80,6 +94,23 @@ export function ProveedorTasa({ children }) {
     };
   }, [cargarTasa]);
 
+  const establecerTasaManual = useCallback(async (valor) => {
+    const nueva = Number(valor);
+    if (!Number.isFinite(nueva) || nueva < 10) {
+      throw new Error("La tasa manual debe ser un número igual o mayor a 10 VES por USD.");
+    }
+    setTasa(nueva);
+    setFechaTasa(new Date().toISOString());
+    setFuente("tasa manual");
+    setErrorTasa("");
+    await guardarAjustes({
+      [CLAVES_AJUSTES.TASA_USD]: nueva,
+      [CLAVES_AJUSTES.TASA_ACTUALIZADA_EN]: new Date().toISOString(),
+      [CLAVES_AJUSTES.TASA_MANUAL]: true,
+    });
+    return nueva;
+  }, []);
+
   return (
     <TasaContext.Provider
       value={{
@@ -89,6 +120,7 @@ export function ProveedorTasa({ children }) {
         cargandoTasa,
         errorTasa,
         refrescarTasa: () => cargarTasa(false),
+        establecerTasaManual,
       }}
     >
       {children}

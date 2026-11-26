@@ -44,6 +44,10 @@ import {
   resumenVariantes,
 } from "@/lib/utilidades/formato";
 
+function codigoBarrasDe(registro) {
+  return String(registro?.codigoBarra || registro?.codigoBarras || "");
+}
+
 function Miniatura({ Icono, etiqueta, valor, detalle, tono = "verde" }) {
   const tonos = {
     verde: "bg-[var(--primario-suave)] text-[var(--primario-fuerte)]",
@@ -72,6 +76,15 @@ export default function PaginaInventario() {
   const productos =
     useLiveQuery(() => (db ? db.productos.orderBy("creadoEn").reverse().toArray() : []), [], []) ||
     [];
+  const imagenes =
+    useLiveQuery(() => (db ? db.imagenesProducto.toArray() : []), [], []) || [];
+  const imagenesPorProducto = useMemo(
+    () =>
+      Object.fromEntries(
+        imagenes.map((imagen) => [imagen.productoId, imagen.datos])
+      ),
+    [imagenes]
+  );
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("todas");
   const [filtro, setFiltro] = useState("todos");
@@ -95,13 +108,13 @@ export default function PaginaInventario() {
         !termino ||
         producto.nombre.toLowerCase().includes(termino) ||
         producto.sku.toLowerCase().includes(termino) ||
-        String(producto.codigoBarras || "").toLowerCase().includes(termino) ||
+        codigoBarrasDe(producto).toLowerCase().includes(termino) ||
         producto.categoria?.toLowerCase().includes(termino) ||
         (producto.variantes || []).some(
           (variante) =>
             variante.nombre.toLowerCase().includes(termino) ||
             variante.sku.toLowerCase().includes(termino) ||
-            String(variante.codigoBarras || "").toLowerCase().includes(termino)
+            codigoBarrasDe(variante).toLowerCase().includes(termino)
         );
       const coincideCategoria = categoria === "todas" || producto.categoria === categoria;
       let coincideFiltro = true;
@@ -321,9 +334,17 @@ export default function PaginaInventario() {
                       <tr key={producto.id}>
                         <td>
                           <div className="flex items-start gap-2.5">
-                            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
-                              <Boxes className="h-4 w-4" />
-                            </span>
+                            {imagenesPorProducto[producto.id] ? (
+                              <img
+                                src={imagenesPorProducto[producto.id]}
+                                alt={`Foto de ${producto.nombre}`}
+                                className="mt-0.5 h-9 w-9 shrink-0 rounded-xl border border-[var(--borde)] object-cover"
+                              />
+                            ) : (
+                              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
+                                <Boxes className="h-4 w-4" />
+                              </span>
+                            )}
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <p className="max-w-[260px] truncate text-xs font-semibold">
@@ -331,6 +352,9 @@ export default function PaginaInventario() {
                                 </p>
                                 {producto.activo === false ? (
                                   <Etiqueta variante="peligro">Inactivo</Etiqueta>
+                                ) : null}
+                                {producto.visibleTienda ? (
+                                  <Etiqueta variante="exito">En tienda</Etiqueta>
                                 ) : null}
                               </div>
                               <p className="font-mono text-[10px] text-[var(--texto-suave)]">
@@ -464,18 +488,31 @@ export default function PaginaInventario() {
               return (
                 <Tarjeta key={producto.id} className="p-3.5">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">{producto.nombre}</p>
-                      <p className="font-mono text-[10px] text-[var(--texto-suave)]">
-                        {producto.sku}
-                      </p>
-                      {producto.variantes?.length ? (
-                        <p className="mt-0.5 truncate text-[10px] text-[var(--texto-suave)]">
-                          {resumenVariantes(producto)}
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      {imagenesPorProducto[producto.id] ? (
+                        <img
+                          src={imagenesPorProducto[producto.id]}
+                          alt={`Foto de ${producto.nombre}`}
+                          className="h-11 w-11 shrink-0 rounded-xl border border-[var(--borde)] object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
+                          <Boxes className="h-4 w-4" />
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{producto.nombre}</p>
+                        <p className="font-mono text-[10px] text-[var(--texto-suave)]">
+                          {producto.sku}
                         </p>
-                      ) : null}
+                        {producto.variantes?.length ? (
+                          <p className="mt-0.5 truncate text-[10px] text-[var(--texto-suave)]">
+                            {resumenVariantes(producto)}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex shrink-0 gap-1">
                       <Boton
                         variante="fantasma"
                         tamano="icono"
@@ -501,6 +538,9 @@ export default function PaginaInventario() {
                       {producto.tipoEmpaque === "bulto" ? "bultos" : "uds."}
                     </Etiqueta>
                     <Etiqueta variante="info">{etiquetaEmpaque(producto)}</Etiqueta>
+                    {producto.visibleTienda ? (
+                      <Etiqueta variante="exito">En tienda</Etiqueta>
+                    ) : null}
                     {producto.ofertaActiva ? (
                       <Etiqueta variante="advertencia">
                         -{formatearPorcentaje(producto.ofertaDescuento)} desde{" "}

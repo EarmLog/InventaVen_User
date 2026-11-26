@@ -4,6 +4,7 @@ import {
   CLAVES_AJUSTES,
   TIPOS_PAGO,
   TIPOS_ERROR_VENTA,
+  ORIGENES_DEUDA,
 } from "@/lib/utilidades/constantes";
 import {
   generarId,
@@ -182,6 +183,7 @@ export async function guardarProducto(datos) {
       tasaUsd,
       stockMinimo: Math.max(0, limpiarNumero(datos.stockMinimo, 0)),
       activo: datos.activo !== false,
+      visibleTienda: Boolean(datos.visibleTienda),
       ofertaActiva: Boolean(datos.ofertaActiva),
       ofertaCantidad: Math.max(1, Math.round(limpiarNumero(datos.ofertaCantidad, 1))),
       ofertaDescuento: Math.min(
@@ -334,6 +336,10 @@ export async function registrarVenta({
   montoRecibidoVes = 0,
   aplicarIva = false,
   porcentajeIva = 0,
+  clienteId = null,
+  cliente = null,
+  esCredito = false,
+  origenCredito = "fiado",
 }) {
   validarBaseDatos();
   if (!Array.isArray(items) || items.length === 0) {
@@ -342,6 +348,16 @@ export async function registrarVenta({
   const tipoValido = TIPOS_PAGO.some((tipo) => tipo.valor === tipoPago)
     ? tipoPago
     : "efectivo";
+  const esDeuda = esCredito || tipoValido === "deuda";
+  const origenValido = ORIGENES_DEUDA.some((origen) => origen.valor === origenCredito)
+    ? origenCredito
+    : "fiado";
+  const ajustesVenta = await obtenerAjustes();
+  const comisionCasheaPorcentaje = Math.min(
+    100,
+    Math.max(0, Number(ajustesVenta?.[CLAVES_AJUSTES.COMISION_CASHEA]) || 0)
+  );
+  let idClienteDeuda = clienteId || cliente?.id || null;
 
   const venta = await db.transaction(
     "rw",
@@ -349,6 +365,8 @@ export async function registrarVenta({
     db.ventas,
     db.secuencias,
     db.movimientos,
+    db.clientes,
+    db.deudas,
     async () => {
       const ahora = new Date().toISOString();
       const ventaId = generarId();
@@ -513,15 +531,81 @@ export async function registrarVenta({
         costoTotalUsd,
         gananciaUsd,
         tasaUsd: tasa,
-        montoRecibidoVes: Math.max(0, Number(montoRecibidoVes) || 0),
-        vueltoVes: Math.max(
-          0,
-          redondear((Number(montoRecibidoVes) || 0) - totalVes)
-        ),
+        montoRecibidoVes: esDeuda
+          ? 0
+          : Math.max(0, Number(montoRecibidoVes) || 0),
+        vueltoVes: esDeuda
+          ? 0
+          : Math.max(
+              0,
+              redondear((Number(montoRecibidoVes) || 0) - totalVes)
+            ),
+        esCredito: esDeuda,
+        origenCredito: esDeuda ? origenValido : null,
+        clienteId: idClienteDeuda,
+        deudaId: null,
         creadoEn: ahora,
         actualizadoEn: ahora,
         historialEdiciones: [],
       };
+
+      if (esDeuda) {
+        const datosCliente = cliente || {};
+        const nombreCliente =
+          limpiarTexto(datosCliente.nombre || clienteNombre, 160) || "Cliente sin nombre";
+        idClienteDeuda = idClienteDeuda || generarId();
+        const clienteExistente = await db.clientes.get(idClienteDeuda);
+        await db.clientes.put({
+          ...(clienteExistente || {}),
+          id: idClienteDeuda,
+          nombre: nombreCliente,
+          telefono: limpiarTexto(datosCliente.telefono, 40),
+          documento: limpiarTexto(datosCliente.documento || clienteDocumento, 40),
+          direccion: limpiarTexto(datosCliente.direccion, 200),
+          notas: limpiarTexto(datosCliente.notas, 500),
+          creadoEn: clienteExistente?.creadoEn || ahora,
+          actualizadoEn: ahora,
+        });
+
+        const secuenciaDeuda = await siguienteSecuenciaEnTransaccion(
+          SECUENCIAS.DEUDAS,
+          6
+        );
+        const comisionUsd =
+          origenValido === "cashea"
+            ? redondear((totalUsd * comisionCasheaPorcentaje) / 100)
+            : 0;
+        const comisionVes =
+          origenValido === "cashea"
+            ? redondear((totalVes * comisionCasheaPorcentaje) / 100)
+            : 0;
+        const deudaId = generarId();
+        await db.deudas.add({
+          id: deudaId,
+          codigo: `DEU-${secuenciaDeuda.codigo}`,
+          ventaId: venta.id,
+          clienteId: idClienteDeuda,
+          origen: origenValido,
+          estado: "pendiente",
+          capitalUsd: totalUsd,
+          capitalVes: totalVes,
+          saldoUsd: totalUsd,
+          saldoVes: totalVes,
+          comisionCasheaPorcentaje:
+            origenValido === "cashea" ? comisionCasheaPorcentaje : 0,
+          comisionCasheaUsd: comisionUsd,
+          comisionCasheaVes: comisionVes,
+          netoCasheaUsd: redondear(totalUsd - comisionUsd),
+          netoCasheaVes: redondear(totalVes - comisionVes),
+          tasaUsd: tasa,
+          fecha: ahora,
+          creadoEn: ahora,
+          actualizadoEn: ahora,
+        });
+        venta.clienteId = idClienteDeuda;
+        venta.deudaId = deudaId;
+      }
+
       await db.ventas.add(venta);
       return venta;
     }
@@ -905,4 +989,244 @@ export async function registrarOperacionEspeciale({
 export async function listarOperacionesEspeciales() {
   validarBaseDatos();
   return db.operacionesEspeciales.orderBy("fecha").reverse().toArray();
+}
+
+export async function guardarCliente(datos) {
+  validarBaseDatos();
+  const nombre = limpiarTexto(datos?.nombre, 160);
+  if (!nombre) throw new Error("El nombre del cliente es obligatorio.");
+  const ahora = new Date().toISOString();
+  const id = datos.id || generarId();
+  const existente = await db.clientes.get(id);
+  const registro = {
+    ...(existente || {}),
+    id,
+    nombre,
+    telefono: limpiarTexto(datos.telefono, 40),
+    documento: limpiarTexto(datos.documento, 40),
+    direccion: limpiarTexto(datos.direccion, 200),
+    notas: limpiarTexto(datos.notas, 500),
+    creadoEn: existente?.creadoEn || ahora,
+    actualizadoEn: ahora,
+  };
+  await db.clientes.put(registro);
+  return registro;
+}
+
+export async function listarClientes() {
+  if (!db) return [];
+  return db.clientes.orderBy("nombre").toArray();
+}
+
+export async function obtenerCliente(id) {
+  if (!db) return null;
+  return db.clientes.get(id);
+}
+
+export async function listarDeudas() {
+  if (!db) return [];
+  return db.deudas.orderBy("creadoEn").reverse().toArray();
+}
+
+export async function obtenerDeuda(id) {
+  if (!db) return null;
+  return db.deudas.get(id);
+}
+
+export async function listarAbonos(deudaId = null) {
+  if (!db) return [];
+  const registros = deudaId
+    ? await db.abonos.where("deudaId").equals(deudaId).toArray()
+    : await db.abonos.toArray();
+  return registros.sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+}
+
+export async function registrarAbono({
+  deudaId,
+  monto,
+  moneda = "VES",
+  metodoPago = "efectivo",
+  tasaUsd = 0,
+  fecha = null,
+  nota = "",
+}) {
+  validarBaseDatos();
+  if (!deudaId) throw new Error("La deuda no es válida.");
+  const montoNumero = Math.max(0, Number(monto) || 0);
+  if (montoNumero <= 0) throw new Error("El abono debe ser mayor a cero.");
+  const tasa = Math.max(0, Number(tasaUsd) || 0);
+  if (tasa <= 0) {
+    throw new Error("Necesitas una tasa válida para registrar el abono.");
+  }
+  const monedaValida = moneda === "USD" ? "USD" : "VES";
+  const montoUsd = redondear(monedaValida === "USD" ? montoNumero : montoNumero / tasa);
+  const montoVes = redondear(monedaValida === "VES" ? montoNumero : montoNumero * tasa);
+
+  return db.transaction(
+    "rw",
+    db.deudas,
+    db.abonos,
+    db.clientes,
+    db.ajustes,
+    async () => {
+      const deuda = await db.deudas.get(deudaId);
+      if (!deuda) throw new Error("La deuda no existe.");
+      if (deuda.estado === "pagada") {
+        throw new Error("Esta deuda ya está saldada.");
+      }
+      const ajusteDolar = await db.ajustes.get(
+        CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR
+      );
+      const actualizarPorDolar = Boolean(ajusteDolar?.valor);
+      const saldoUsd = Math.max(0, redondear(Number(deuda.saldoUsd) - montoUsd));
+      const saldoVes = actualizarPorDolar
+        ? redondear(saldoUsd * tasa)
+        : Math.max(0, redondear(Number(deuda.saldoVes) - montoVes));
+      const capitalUsd = Number(deuda.capitalUsd) || 0;
+      const estado =
+        saldoUsd <= 0.005
+          ? "pagada"
+          : saldoUsd < capitalUsd - 0.005
+            ? "parcial"
+            : "pendiente";
+      const ahora = new Date().toISOString();
+      const deudaActualizada = {
+        ...deuda,
+        saldoUsd,
+        saldoVes,
+        estado,
+        tasaUsd: actualizarPorDolar ? tasa : deuda.tasaUsd,
+        fechaUltimoAbono: ahora,
+        actualizadoEn: ahora,
+      };
+      await db.deudas.put(deudaActualizada);
+
+      const abono = {
+        id: generarId(),
+        deudaId,
+        clienteId: deuda.clienteId,
+        ventaId: deuda.ventaId,
+        monto: montoNumero,
+        moneda: monedaValida,
+        montoUsd,
+        montoVes,
+        metodoPago,
+        tasaUsd: tasa,
+        fecha: fecha || ahora,
+        nota: limpiarTexto(nota, 300),
+        esIngreso: true,
+        creadoEn: ahora,
+      };
+      await db.abonos.add(abono);
+
+      const cliente = await db.clientes.get(deuda.clienteId);
+      if (cliente) {
+        await db.clientes.put({ ...cliente, actualizadoEn: ahora });
+      }
+
+      return { abono, deuda: deudaActualizada };
+    }
+  );
+}
+
+export async function actualizarSaldosDeudoresPorTasa(nuevaTasa) {
+  validarBaseDatos();
+  const tasa = Math.max(0, Number(nuevaTasa) || 0);
+  if (tasa <= 0) return { actualizados: 0 };
+  const ajuste = await db.ajustes.get(CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR);
+  if (!Boolean(ajuste?.valor)) return { actualizados: 0 };
+
+  return db.transaction("rw", db.deudas, async () => {
+    const deudas = await db.deudas.toArray();
+    const ahora = new Date().toISOString();
+    let actualizados = 0;
+    for (const deuda of deudas) {
+      if (deuda.estado === "pagada") continue;
+      await db.deudas.put({
+        ...deuda,
+        saldoVes: redondear(Number(deuda.saldoUsd) * tasa),
+        tasaUsd: tasa,
+        actualizadoEn: ahora,
+      });
+      actualizados += 1;
+    }
+    return { actualizados };
+  });
+}
+
+export async function obtenerResumenDeudores() {
+  if (!db) return [];
+  const [clientes, deudas, abonos] = await Promise.all([
+    db.clientes.toArray(),
+    db.deudas.toArray(),
+    db.abonos.toArray(),
+  ]);
+  const ahora = Date.now();
+  return clientes
+    .map((cliente) => {
+      const deudasCliente = deudas.filter((deuda) => deuda.clienteId === cliente.id);
+      const abonosCliente = abonos.filter((abono) => abono.clienteId === cliente.id);
+      const activas = deudasCliente.filter((deuda) => deuda.estado !== "pagada");
+      return {
+        ...cliente,
+        totalDeudas: deudasCliente.length,
+        deudasActivas: activas.length,
+        deudasPagadas: deudasCliente.length - activas.length,
+        saldoUsd: redondear(activas.reduce((total, deuda) => total + (Number(deuda.saldoUsd) || 0), 0)),
+        saldoVes: redondear(activas.reduce((total, deuda) => total + (Number(deuda.saldoVes) || 0), 0)),
+        totalAbonadoUsd: redondear(abonosCliente.reduce((total, abono) => total + (Number(abono.montoUsd) || 0), 0)),
+        totalAbonadoVes: redondear(abonosCliente.reduce((total, abono) => total + (Number(abono.montoVes) || 0), 0)),
+        ultimaActividad: deudasCliente
+          .map((deuda) => deuda.fecha || deuda.creadoEn || "")
+          .sort((a, b) => String(b).localeCompare(String(a)))[0] || null,
+        vencida: activas.some((deuda) => {
+          if (!deuda.fechaVencimiento) return false;
+          return new Date(deuda.fechaVencimiento).getTime() < ahora;
+        }),
+      };
+    })
+    .sort((a, b) => b.saldoUsd - a.saldoUsd);
+}
+
+export async function guardarImagenProducto({ productoId, datos, mime, ancho, alto }) {
+  validarBaseDatos();
+  if (!productoId || !datos) throw new Error("La imagen del producto no es válida.");
+  return db.transaction("rw", db.imagenesProducto, async () => {
+    const existentes = await db.imagenesProducto
+      .where("productoId")
+      .equals(productoId)
+      .toArray();
+    for (const registro of existentes) {
+      await db.imagenesProducto.delete(registro.id);
+    }
+    const ahora = new Date().toISOString();
+    const registro = {
+      id: generarId(),
+      productoId,
+      datos,
+      mime: mime || "image/jpeg",
+      ancho: Number(ancho) || 0,
+      alto: Number(alto) || 0,
+      creadoEn: existentes[0]?.creadoEn || ahora,
+      actualizadoEn: ahora,
+    };
+    await db.imagenesProducto.put(registro);
+    return registro;
+  });
+}
+
+export async function obtenerImagenProducto(productoId) {
+  if (!db || !productoId) return null;
+  return db.imagenesProducto.where("productoId").equals(productoId).first() || null;
+}
+
+export async function listarImagenesProductos() {
+  if (!db) return [];
+  return db.imagenesProducto.toArray();
+}
+
+export async function eliminarImagenProducto(productoId) {
+  validarBaseDatos();
+  const registros = await db.imagenesProducto.where("productoId").equals(productoId).toArray();
+  await Promise.all(registros.map((registro) => db.imagenesProducto.delete(registro.id)));
 }
