@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 
 export default function CompartirBarra({ url = "", nombreNegocio = "esta tienda" }) {
   const [destino, setDestino] = useState(url);
   const [copiado, setCopiado] = useState(false);
   const [errorCopia, setErrorCopia] = useState(false);
+  const detalles = useRef(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -26,6 +27,7 @@ export default function CompartirBarra({ url = "", nombreNegocio = "esta tienda"
       await navigator.clipboard.writeText(destino);
       setCopiado(true);
       setErrorCopia(false);
+      if (detalles.current) detalles.current.open = false;
     } catch {
       setErrorCopia(true);
     }
@@ -54,36 +56,42 @@ export default function CompartirBarra({ url = "", nombreNegocio = "esta tienda"
   ];
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--texto)]">
-        <Share2 className="h-4 w-4 text-emerald-600" />
-        Compartir catálogo
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+    <details ref={detalles} className="relative shrink-0">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[var(--borde)] bg-[var(--superficie-2)] px-2.5 py-2 text-[11px] font-bold text-[var(--texto)] transition hover:bg-[var(--superficie-3)] [&::-webkit-details-marker]:hidden">
+        <Share2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+        <span className="hidden sm:inline">Compartir</span>
+      </summary>
+      <div className="absolute right-0 z-40 mt-2 w-56 rounded-xl border border-[var(--borde)] bg-[var(--superficie)] p-2 shadow-xl">
         {enlaces.map(({ etiqueta, href, icono: Icono, clase }) => (
           <a
             key={etiqueta}
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${clase}`}
+            className={`mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white transition ${clase}`}
           >
-            <Icono className="h-4 w-4" />
+            <Icono className="h-3.5 w-3.5" />
             {etiqueta}
           </a>
         ))}
         <button
           type="button"
           onClick={copiar}
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--borde)] bg-[var(--superficie)] px-3 py-2 text-xs font-semibold text-[var(--texto)] transition hover:bg-[var(--superficie-2)]"
+          className="flex w-full items-center gap-2 rounded-lg border border-[var(--borde)] px-3 py-2 text-xs font-semibold text-[var(--texto)] transition hover:bg-[var(--superficie-2)]"
         >
-          {copiado ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+          {copiado ? (
+            <Check className="h-3.5 w-3.5 text-emerald-600" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
           {copiado ? "Enlace copiado" : "Copiar enlace"}
         </button>
         {errorCopia ? (
-          <span className="text-xs text-red-500">No se pudo copiar el enlace.</span>
+          <p className="px-1 pt-2 text-[10px] text-red-500">
+            No se pudo copiar el enlace.
+          </p>
         ) : null}
       </div>
-    </div>
+    </details>
   );
 }

@@ -1,11 +1,8 @@
 "use client";
 
 import { MessageCircle, PackageOpen, Store } from "lucide-react";
-import {
-  formatearFecha,
-  formatearUsd,
-  formatearVes,
-} from "@/lib/utilidades/formato";
+import { formatearFecha, formatearVes } from "@/lib/utilidades/formato";
+import TarjetaProductoPublico from "./TarjetaProductoPublico";
 
 export default function VistaPreviaTienda({
   nombreNegocio,
@@ -17,11 +14,17 @@ export default function VistaPreviaTienda({
   const telefonoLimpio = String(telefono || "").replace(/\D/g, "");
   const enlaceWhatsapp = telefonoLimpio ? `https://wa.me/${telefonoLimpio}` : "";
   const lista = Array.isArray(productos) ? productos : [];
+  const detalle = [
+    Number(tasa) > 0 ? `Tasa ${formatearVes(tasa)}/USD` : "",
+    publicadaEn ? `Actualizado ${formatearFecha(publicadaEn)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="w-full max-w-[380px] overflow-hidden rounded-[2rem] border border-[var(--borde)] bg-[var(--superficie)] shadow-2xl">
-      <div className="flex items-center justify-between border-b border-[var(--borde)] bg-[var(--superficie-2)] px-4 py-2.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--texto-suave)]">
+    <div className="w-full max-w-[380px] overflow-hidden rounded-[1.75rem] border border-[var(--borde)] bg-[var(--superficie)] shadow-2xl">
+      <div className="flex items-center justify-between border-b border-[var(--borde)] bg-[var(--superficie-2)] px-4 py-2">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--texto-suave)]">
           Vista en teléfono
         </span>
         <span className="text-[10px] text-[var(--texto-tenue)]">
@@ -29,134 +32,71 @@ export default function VistaPreviaTienda({
         </span>
       </div>
 
-      <div className="max-h-[640px] overflow-y-auto bg-[var(--superficie-2)] p-3">
-        <div className="overflow-hidden rounded-2xl border border-[var(--borde)] bg-[var(--superficie)]">
-          <header className="bg-gradient-to-r from-emerald-600 to-teal-500 px-4 py-5 text-white">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-white/15 p-2.5">
-                <Store className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-50/80">
-                  Catálogo en línea
-                </p>
-                <h3 className="mt-1 break-words text-lg font-bold">
-                  {nombreNegocio || "Mi negocio"}
-                </h3>
-                {publicadaEn ? (
-                  <p className="mt-0.5 text-[10px] text-emerald-50/80">
-                    Actualizado el {formatearFecha(publicadaEn)}
-                  </p>
-                ) : null}
-              </div>
+      <div className="max-h-[660px] overflow-y-auto bg-[var(--superficie-2)] pb-14">
+        <header className="sticky top-0 z-10 border-b border-[var(--borde)] bg-[var(--superficie)] px-3 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Store className="h-4 w-4" />
             </div>
-
-            {Number(tasa) > 0 ? (
-              <p className="mt-3 rounded-lg bg-white/15 px-2.5 py-1.5 text-[10px] font-medium">
-                Tasa: {formatearVes(tasa)} por USD
+            <div className="min-w-0">
+              <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                Catálogo en línea
               </p>
-            ) : null}
-
-            {enlaceWhatsapp ? (
-              <a
-                href={enlaceWhatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                Contactar por WhatsApp
-              </a>
-            ) : null}
-          </header>
-
-          <div className="px-3 py-3">
-            <div className="mb-2.5 flex items-end justify-between gap-2">
-              <p className="text-xs font-bold text-[var(--texto)]">Productos</p>
-              <p className="text-[10px] text-[var(--texto-suave)]">
-                {lista.length} {lista.length === 1 ? "disponible" : "disponibles"}
-              </p>
+              <h3 className="truncate text-[13px] font-extrabold leading-tight">
+                {nombreNegocio || "Mi negocio"}
+              </h3>
+              {detalle ? (
+                <p className="truncate text-[9px] text-[var(--texto-suave)]">
+                  {detalle}
+                </p>
+              ) : null}
             </div>
-
-            {lista.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--borde)] px-4 py-10 text-center">
-                <PackageOpen className="h-7 w-7 text-[var(--texto-tenue)]" />
-                <p className="text-xs font-semibold text-[var(--texto)]">
-                  Todavía no hay productos
-                </p>
-                <p className="text-[10px] text-[var(--texto-suave)]">
-                  Marca productos como visibles y publica la tienda.
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {lista.map((producto) => (
-                  <article
-                    key={producto.id || producto.nombre}
-                    className="overflow-hidden rounded-xl border border-[var(--borde)] bg-[var(--superficie)]"
-                  >
-                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-[var(--superficie-3)]">
-                      <div className="absolute inset-0 flex items-center justify-center text-[var(--texto-tenue)]">
-                        <PackageOpen className="h-8 w-8" />
-                      </div>
-                      {producto.imagenUrl ? (
-                        <img
-                          src={producto.imagenUrl}
-                          alt={producto.nombre}
-                          loading="lazy"
-                          className="absolute inset-0 h-full w-full object-cover"
-                          onError={(evento) => {
-                            evento.currentTarget.style.display = "none";
-                          }}
-                        />
-                      ) : null}
-                      {producto.categoria ? (
-                        <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 shadow-sm">
-                          {producto.categoria}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-col gap-1.5 p-3">
-                      <h4 className="text-xs font-semibold text-[var(--texto)]">
-                        {producto.nombre}
-                      </h4>
-                      {producto.descripcion ? (
-                        <p className="line-clamp-3 text-[11px] leading-relaxed text-[var(--texto-suave)]">
-                          {producto.descripcion}
-                        </p>
-                      ) : null}
-                      <div className="mt-auto flex flex-wrap items-end justify-between gap-2 border-t border-[var(--borde)] pt-2">
-                        <div>
-                          <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                            {formatearUsd(producto.precioUsd)}
-                          </p>
-                          <p className="text-[11px] text-[var(--texto-suave)]">
-                            {formatearVes(producto.precioVes)}
-                          </p>
-                        </div>
-                        {enlaceWhatsapp ? (
-                          <a
-                            href={`${enlaceWhatsapp}?text=${encodeURIComponent(
-                              `Hola, quiero información sobre ${producto.nombre}`
-                            )}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] font-semibold text-emerald-700 transition hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
-                          >
-                            <MessageCircle className="h-3 w-3" />
-                            Consultar
-                          </a>
-                        ) : null}
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
           </div>
+        </header>
+
+        <div className="px-3 pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] font-extrabold">Productos</p>
+            <p className="text-[9px] text-[var(--texto-suave)]">
+              {lista.length} {lista.length === 1 ? "resultado" : "resultados"}
+            </p>
+          </div>
+
+          {lista.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--borde)] px-4 py-10 text-center">
+              <PackageOpen className="h-7 w-7 text-[var(--texto-tenue)]" />
+              <p className="text-xs font-bold">Todavía no hay productos</p>
+              <p className="text-[10px] text-[var(--texto-suave)]">
+                Marca productos como visibles y publica la tienda.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {lista.map((producto) => (
+                <TarjetaProductoPublico
+                  key={producto.id || producto.nombre}
+                  producto={producto}
+                  enlaceWhatsapp={enlaceWhatsapp}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {enlaceWhatsapp ? (
+        <div className="border-t border-[var(--borde)] bg-[var(--superficie)] p-2.5">
+          <a
+            href={enlaceWhatsapp}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 text-[11px] font-extrabold text-white transition hover:bg-emerald-700"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Contactar por WhatsApp
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }
