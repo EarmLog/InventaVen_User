@@ -241,7 +241,7 @@ export default function ModalCobro({
               <HandCoins className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <p className="text-[11px] font-semibold leading-relaxed text-[var(--primario-fuerte)]">
                 El total quedará como deuda ({origenEtiqueta}) y podrás cobrarlo
-                desde Deudores y cobranzas.
+                desde Deudas/Pendientes.
               </p>
             </div>
           ) : null}

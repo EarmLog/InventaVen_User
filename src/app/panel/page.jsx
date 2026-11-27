@@ -249,7 +249,7 @@ export default function PaginaPanel() {
         />
         <TarjetaIndicador
           Icono={Users}
-          etiqueta="Deudores"
+          etiqueta="Deudas/Pendientes"
           valor={
             deudoresConSaldo.length
               ? formatearVes(saldoDeudoresVes)
@@ -258,10 +258,10 @@ export default function PaginaPanel() {
           detalle={
             deudoresConSaldo.length
               ? `${deudoresConSaldo.length} deudor${deudoresConSaldo.length === 1 ? "" : "es"} · ${formatearUsd(saldoDeudoresUsd)}`
-              : "Abre Deudores para ver el detalle"
+              : "Abre Deudas/Pendientes para ver el detalle"
           }
           tono="ambar"
-          onClick={() => router.push("/panel/deudores")}
+          onClick={() => router.push("/panel/deudas-pendientes?pestana=deudas")}
         />
       </div>
 

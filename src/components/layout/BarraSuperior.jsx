@@ -24,12 +24,11 @@ const TITULOS = {
   "/panel": "Panel general",
   "/panel/inventario": "Inventario",
   "/panel/pos": "Punto de venta",
-  "/panel/deudores": "Deudores y cobranzas",
+  "/panel/deudas-pendientes": "Deudas/Pendientes",
   "/panel/analisis": "Análisis de ventas",
   "/panel/fiscal": "Facturación y fiscalidad",
   "/panel/tienda": "Tienda online",
   "/panel/auditoria": "Auditoría",
-  "/panel/pendientes": "Ventas pendientes",
   "/panel/configuracion": "Configuración",
 };
 

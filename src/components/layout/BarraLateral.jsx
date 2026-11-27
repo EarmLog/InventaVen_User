@@ -14,7 +14,6 @@ import {
   Settings,
   ShieldCheck,
   Store,
-  TriangleAlert,
   X,
 } from "lucide-react";
 import { db } from "@/lib/db/baseDatos";
@@ -24,12 +23,15 @@ const ENLACES = [
   { href: "/panel", etiqueta: "Panel", Icono: LayoutDashboard },
   { href: "/panel/inventario", etiqueta: "Inventario", Icono: Boxes },
   { href: "/panel/pos", etiqueta: "Punto de venta", Icono: ScanBarcode },
-  { href: "/panel/deudores", etiqueta: "Deudores", Icono: HandCoins },
+  {
+    href: "/panel/deudas-pendientes",
+    etiqueta: "Deudas/Pendientes",
+    Icono: HandCoins,
+  },
   { href: "/panel/analisis", etiqueta: "Análisis", Icono: BarChart3 },
   { href: "/panel/fiscal", etiqueta: "Facturación y fiscalidad", Icono: FileText },
   { href: "/panel/tienda", etiqueta: "Tienda online", Icono: Store },
   { href: "/panel/auditoria", etiqueta: "Auditoría", Icono: ShieldCheck },
-  { href: "/panel/pendientes", etiqueta: "Pendientes", Icono: TriangleAlert },
   { href: "/panel/configuracion", etiqueta: "Configuración", Icono: Settings },
 ];
 
@@ -83,11 +85,7 @@ function Contenido({ perfil, alNavegar }) {
           const activo =
             href === "/panel" ? pathname === "/panel" : pathname.startsWith(href);
           const cantidad =
-            etiqueta === "Pendientes"
-              ? pendientes
-              : etiqueta === "Deudores"
-                ? deudasActivas
-                : 0;
+            etiqueta === "Deudas/Pendientes" ? pendientes + deudasActivas : 0;
           return (
             <Link
               key={href}
@@ -104,13 +102,12 @@ function Contenido({ perfil, alNavegar }) {
               <span className="flex-1">{etiqueta}</span>
               {cantidad > 0 ? (
                 <span
+                  aria-label={`${cantidad} registros entre deudas y ventas pendientes`}
                   className={[
                     "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
                     activo
                       ? "bg-white/20 text-white"
-                      : etiqueta === "Deudores"
-                        ? "bg-[var(--primario-suave)] text-[var(--primario-fuerte)]"
-                        : "bg-[var(--advertencia-suave)] text-[var(--advertencia)]",
+                      : "bg-[var(--advertencia-suave)] text-[var(--advertencia)]",
                   ].join(" ")}
                 >
                   {cantidad}

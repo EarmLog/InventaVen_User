@@ -1,6 +1,6 @@
 # InventaVen User
 
-InventaVen User es la aplicacion web de gestion comercial del negocio: inventario, punto de venta, analisis de ventas, ventas pendientes y configuracion.
+InventaVen User es la aplicacion web de gestion comercial del negocio: inventario, punto de venta, analisis de ventas, deudas y ventas pendientes, y configuracion.
 
 ![Inicio de sesion](docs/capturas/01-inicio_sesion.png)
 
@@ -17,7 +17,7 @@ InventaVen User es la aplicacion web de gestion comercial del negocio: inventari
 - Gestion de inventario con productos, variantes y alertas de stock.
 - Punto de venta con carrito, descuentos, IVA automatico y cobro.
 - Analisis de ventas con metricas en VES y USD, incluida la ganancia estimada.
-- Ventas pendientes con renovar, restablecer, editar y eliminar.
+- Deudas y ventas pendientes en una sola seccion con pestañas: cobros, abonos y ventas reportadas con renovar, restablecer, editar y eliminar.
 - Configuracion de seguridad y datos.
 
 ## Stack

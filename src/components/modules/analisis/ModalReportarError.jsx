@@ -36,7 +36,9 @@ export default function ModalReportarError({
     setProcesando(true);
     try {
       await reportarErrorVenta(venta.id, { tipo, nota });
-      toast.success(`La venta ${venta.numeroFactura} se movió a Pendientes.`);
+      toast.success(
+        `La venta ${venta.numeroFactura} se movió a Deudas/Pendientes.`
+      );
       onReportada?.();
       onCerrar?.();
     } catch (err) {
@@ -80,8 +82,9 @@ export default function ModalReportarError({
         </div>
 
         <Alerta tipo="advertencia" titulo="La venta saldrá del análisis">
-          El stock no se devuelve automáticamente. La venta quedará en el módulo
-          Pendientes para editarla, renovarla, restablecerla o eliminarla.
+          El stock no se devuelve automáticamente. La venta quedará en la pestaña
+          “Ventas pendientes” de Deudas/Pendientes para editarla, renovarla,
+          restablecerla o eliminarla.
         </Alerta>
 
         <Campo etiqueta="¿Qué ocurrió?" requerido>
