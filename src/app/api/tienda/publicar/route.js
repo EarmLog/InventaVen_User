@@ -55,6 +55,16 @@ export async function POST(request) {
       return NextResponse.json({ error: errorValidacion }, { status: 400 });
     }
 
+    const { data: imagenesExistentes, error: errorImagenesExistentes } = await cliente
+      .from("catalogo_productos")
+      .select("producto_id, imagen_url")
+      .eq("tienda_id", usuario.id);
+    if (errorImagenesExistentes) throw errorImagenesExistentes;
+
+    const imagenesActuales = new Map(
+      (imagenesExistentes || []).map((item) => [item.producto_id, item.imagen_url])
+    );
+
     const { data: tiendaActual, error: errorTiendaActual } = await cliente
       .from("tiendas_publicas")
       .select("token")
@@ -128,7 +138,7 @@ export async function POST(request) {
         precio_ves: producto.precioVes,
         imagen_url: producto.imagenBase64
           ? bucket.getPublicUrl(`${usuario.id}/${producto.id}.jpg`).data.publicUrl
-          : null,
+          : imagenesActuales.get(producto.id) || null,
         sku: producto.sku,
         stock: producto.stock,
         variantes: producto.variantes,

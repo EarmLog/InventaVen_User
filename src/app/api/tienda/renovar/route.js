@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { crearClienteServidor, extraerToken } from "@/lib/supabase/servidor";
-import { generarToken, urlTienda } from "@/lib/tiendaPublica";
+import { generarToken, normalizarSlug, urlTienda } from "@/lib/tiendaPublica";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +18,11 @@ function respuestaError(error, mensaje) {
 export async function POST(request) {
   try {
     const cliente = crearClienteServidor();
+    const cuerpoLeido = await request.json().catch(() => ({}));
+    const cuerpo =
+      cuerpoLeido && typeof cuerpoLeido === "object" && !Array.isArray(cuerpoLeido)
+        ? cuerpoLeido
+        : {};
     const tokenSesion = extraerToken(request);
     if (!tokenSesion) {
       return NextResponse.json({ error: "No hay una sesión activa." }, { status: 401 });
@@ -39,12 +44,22 @@ export async function POST(request) {
       return NextResponse.json({ error: "La tienda todavía no está publicada." }, { status: 404 });
     }
 
+    const slugEnviado = String(cuerpo.slug ?? "").trim();
+    let slugFinal = normalizarSlug(cuerpo.slug);
+    if (slugEnviado && !slugFinal) {
+      return NextResponse.json(
+        { error: "El enlace de la tienda no es válido." },
+        { status: 400 }
+      );
+    }
+    if (!slugFinal) slugFinal = tienda.slug;
+
     const token = generarToken();
     const publicadaEn = new Date().toISOString();
 
     const { error: errorActualizacion } = await cliente
       .from("tiendas_publicas")
-      .update({ token, activo: true, actualizado_en: publicadaEn })
+      .update({ slug: slugFinal, token, activo: true, actualizado_en: publicadaEn })
       .eq("usuario_id", usuario.id);
     if (errorActualizacion) throw errorActualizacion;
 
@@ -56,9 +71,9 @@ export async function POST(request) {
     if (errorConteo) throw errorConteo;
 
     return NextResponse.json({
-      slug: tienda.slug,
+      slug: slugFinal,
       token,
-      url: urlTienda(tienda.slug, token),
+      url: urlTienda(slugFinal, token),
       publicadaEn,
       productos: count || 0,
     });

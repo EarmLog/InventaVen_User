@@ -30,6 +30,7 @@ import Interruptor from "@/components/ui/Interruptor";
 import Alerta from "@/components/ui/Alerta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
 import { limpiarTelefono, validarTelefonoVe } from "@/lib/seguridad/validaciones";
+import { normalizarSlug } from "@/lib/tiendaPublica";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 import {
   formatearFechaHora,
@@ -38,17 +39,6 @@ import {
   formatearVes,
 } from "@/lib/utilidades/formato";
 import VistaPreviaTienda from "./VistaPreviaTienda";
-
-function normalizarSlug(valor) {
-  return String(valor || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-}
 
 function imagenABase64(datos) {
   const texto = String(datos || "");
@@ -149,6 +139,7 @@ export default function TiendaOnline() {
     useLiveQuery(() => (db ? db.imagenesProducto.toArray() : []), [], []) || [];
 
   const [slugTienda, setSlugTienda] = useState("");
+  const [slugPublicado, setSlugPublicado] = useState("");
   const [tokenTienda, setTokenTienda] = useState("");
   const [telefonoTienda, setTelefonoTienda] = useState("");
   const [urlTienda, setUrlTienda] = useState("");
@@ -195,7 +186,11 @@ export default function TiendaOnline() {
     (producto) => producto.visibleTienda === true
   ).length;
   const fechaPublicacionTienda = ajustes[CLAVES_AJUSTES.TIENDA_PUBLICADA_EN];
-  const urlVisible = urlTienda || construirUrlTienda(slugTienda, tokenTienda);
+  const urlVisible =
+    slugTienda && tokenTienda ? construirUrlTienda(slugTienda, tokenTienda) : urlTienda;
+  const slugPendiente = Boolean(
+    slugTienda && slugPublicado && normalizarSlug(slugTienda) !== slugPublicado
+  );
 
   useEffect(() => {
     if (ajustesInicializados.current || !Object.keys(ajustes).length) return;
@@ -203,13 +198,14 @@ export default function TiendaOnline() {
     const slug = String(ajustes[CLAVES_AJUSTES.TIENDA_SLUG] || "");
     const token = String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
     setSlugTienda(slug);
+    setSlugPublicado(slug);
     setTokenTienda(token);
     setTelefonoTienda(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""));
     setUrlTienda(token ? construirUrlTienda(slug, token) : "");
   }, [ajustes]);
 
   useEffect(() => {
-    if (!slugTienda || !tokenTienda) {
+    if (!slugPublicado || !tokenTienda) {
       setCatalogoPublico(null);
       setEnlaceInvalido(false);
       setErrorCatalogo("");
@@ -223,7 +219,7 @@ export default function TiendaOnline() {
     setErrorCatalogo("");
 
     fetch(
-      `/api/tienda/${encodeURIComponent(slugTienda)}/${encodeURIComponent(tokenTienda)}`,
+      `/api/tienda/${encodeURIComponent(slugPublicado)}/${encodeURIComponent(tokenTienda)}`,
       { cache: "no-store", signal: control.signal }
     )
       .then(async (respuesta) => {
@@ -260,7 +256,7 @@ export default function TiendaOnline() {
       activo = false;
       control.abort();
     };
-  }, [slugTienda, tokenTienda, versionCatalogo]);
+  }, [slugPublicado, tokenTienda, versionCatalogo]);
 
   async function guardarRespuestaTienda(datos, slug) {
     const slugFinal = datos?.slug || slug;
@@ -276,6 +272,7 @@ export default function TiendaOnline() {
       datos?.publicadaEn || new Date().toISOString()
     );
     setSlugTienda(slugFinal);
+    setSlugPublicado(slugFinal);
     setTokenTienda(token);
     setTelefonoTienda(telefono);
     setUrlTienda(url);
@@ -368,15 +365,21 @@ export default function TiendaOnline() {
       toast.error("Primero publica la tienda para poder renovar el enlace.");
       return;
     }
+    const slugNormalizado = normalizarSlug(slugTienda);
+    if (!slugNormalizado) {
+      toast.error("Escribe un slug válido para renovar el enlace.");
+      return;
+    }
     setRenovandoTienda(true);
     try {
       const encabezados = await obtenerEncabezadosAutenticados();
       const respuesta = await fetch("/api/tienda/renovar", {
         method: "POST",
         headers: encabezados,
+        body: JSON.stringify({ slug: slugNormalizado }),
       });
       const datos = await leerRespuesta(respuesta);
-      await guardarRespuestaTienda(datos, datos?.slug || slugTienda);
+      await guardarRespuestaTienda(datos, slugNormalizado);
       toast.success("Enlace de la tienda renovado correctamente.");
     } catch (error) {
       toast.error(error.message || "No se pudo renovar el enlace.");
@@ -594,9 +597,16 @@ export default function TiendaOnline() {
                 Abrir tienda
               </Boton>
             </div>
+            {slugPendiente ? (
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Cambio de enlace pendiente: pulsa Publicar cambios o Renovar link para
+                aplicarlo.
+              </p>
+            ) : null}
             <p className="text-[11px] text-[var(--texto-suave)]">
               Configura redes sociales y horario en Configuración, y pulsa Publicar cambios
-              para reflejarlos en el enlace público.
+              para reflejarlos en el enlace público. Renovar link aplica el slug actual y
+              cambia el token.
             </p>
           </div>
 
