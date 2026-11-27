@@ -73,6 +73,10 @@ export async function POST(request) {
         token,
         activo: true,
         telefono: datos.telefono,
+        telegram: datos.telegram,
+        instagram: datos.instagram,
+        correo_contacto: datos.correoContacto,
+        horario: datos.horario,
         tasa_publicada: datos.tasa,
         nombre_negocio: datos.nombreNegocio,
         actualizado_en: publicadaEn,
@@ -125,6 +129,9 @@ export async function POST(request) {
         imagen_url: producto.imagenBase64
           ? bucket.getPublicUrl(`${usuario.id}/${producto.id}.jpg`).data.publicUrl
           : null,
+        sku: producto.sku,
+        stock: producto.stock,
+        variantes: producto.variantes,
         orden: indice,
         activo: true,
         actualizado_en: publicadaEn,

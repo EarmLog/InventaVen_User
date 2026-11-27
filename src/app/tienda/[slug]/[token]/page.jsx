@@ -11,8 +11,10 @@ import {
   Store,
 } from "lucide-react";
 import { formatearFecha, formatearVes } from "@/lib/utilidades/formato";
+import { estadoHorario } from "@/lib/utilidades/horario.js";
 import { urlTienda } from "@/lib/tiendaPublica";
 import TarjetaProductoPublico from "@/components/modules/tienda/TarjetaProductoPublico";
+import ModalDetalleProductoPublico from "@/components/modules/tienda/ModalDetalleProductoPublico";
 import CompartirBarra from "./CompartirBarra";
 
 export default function PaginaTienda() {
@@ -25,6 +27,7 @@ export default function PaginaTienda() {
   const [intento, setIntento] = useState(0);
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
 
   useEffect(() => {
     if (!slug || !token) {
@@ -148,6 +151,15 @@ export default function PaginaTienda() {
   ]
     .filter(Boolean)
     .join(" · ");
+  const estadoAtencion = estadoHorario(datos?.horario) || {};
+  const textoHorario = String(estadoAtencion.texto || "").trim();
+  const sinHorario = estadoAtencion.etiqueta === "Sin horario";
+  const mostrarHorario = sinHorario
+    ? Boolean(textoHorario)
+    : Boolean(estadoAtencion.etiqueta || textoHorario);
+  const abiertoAhora =
+    estadoAtencion.abierto === true ||
+    estadoAtencion.etiqueta === "Abierto ahora";
 
   return (
     <main className="min-h-screen bg-[var(--superficie-2)] pb-20 text-[var(--texto)] md:pb-8">
@@ -167,6 +179,26 @@ export default function PaginaTienda() {
               <p className="truncate text-[10px] text-[var(--texto-suave)]">
                 {detalleTienda}
               </p>
+            ) : null}
+            {mostrarHorario ? (
+              <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                {!sinHorario && estadoAtencion.etiqueta ? (
+                  <span
+                    className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-extrabold ${
+                      abiertoAhora
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                    }`}
+                  >
+                    {estadoAtencion.etiqueta}
+                  </span>
+                ) : null}
+                {textoHorario ? (
+                  <span className="truncate text-[10px] text-[var(--texto-suave)]">
+                    {textoHorario}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <CompartirBarra
@@ -258,7 +290,7 @@ export default function PaginaTienda() {
               <TarjetaProductoPublico
                 key={producto.id || producto.nombre}
                 producto={producto}
-                enlaceWhatsapp={enlaceWhatsapp}
+                onAbrir={setProductoSeleccionado}
               />
             ))}
           </div>
@@ -278,6 +310,19 @@ export default function PaginaTienda() {
           </a>
         </div>
       ) : null}
+
+      <ModalDetalleProductoPublico
+        abierto={Boolean(productoSeleccionado)}
+        producto={productoSeleccionado}
+        contactos={{
+          telefono: datos?.telefono,
+          telegram: datos?.telegram,
+          instagram: datos?.instagram,
+          correoContacto: datos?.correoContacto,
+          nombreNegocio: datos?.nombreNegocio,
+        }}
+        onCerrar={() => setProductoSeleccionado(null)}
+      />
     </main>
   );
 }

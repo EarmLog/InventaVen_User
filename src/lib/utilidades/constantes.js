@@ -160,6 +160,10 @@ export const CLAVES_AJUSTES = {
   TIENDA_ACTIVA: "tiendaActiva",
   TIENDA_TELEFONO: "tiendaTelefono",
   TIENDA_PUBLICADA_EN: "tiendaPublicadaEn",
+  TIENDA_HORARIO: "tiendaHorario",
+  TIENDA_TELEGRAM: "tiendaTelegram",
+  TIENDA_INSTAGRAM: "tiendaInstagram",
+  TIENDA_CORREO_CONTACTO: "tiendaCorreoContacto",
 };
 
 export const SECUENCIAS = {

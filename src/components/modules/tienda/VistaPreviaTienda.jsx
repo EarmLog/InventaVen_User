@@ -1,16 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { MessageCircle, PackageOpen, Store } from "lucide-react";
 import { formatearFecha, formatearVes } from "@/lib/utilidades/formato";
+import { estadoHorario } from "@/lib/utilidades/horario.js";
+import ModalDetalleProductoPublico from "./ModalDetalleProductoPublico";
 import TarjetaProductoPublico from "./TarjetaProductoPublico";
 
 export default function VistaPreviaTienda({
   nombreNegocio,
   telefono,
+  telegram,
+  instagram,
+  correoContacto,
+  horario,
   tasa,
   publicadaEn,
   productos,
 }) {
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null);
   const telefonoLimpio = String(telefono || "").replace(/\D/g, "");
   const enlaceWhatsapp = telefonoLimpio ? `https://wa.me/${telefonoLimpio}` : "";
   const lista = Array.isArray(productos) ? productos : [];
@@ -20,6 +28,15 @@ export default function VistaPreviaTienda({
   ]
     .filter(Boolean)
     .join(" · ");
+  const estadoAtencion = estadoHorario(horario) || {};
+  const textoHorario = String(estadoAtencion.texto || "").trim();
+  const sinHorario = estadoAtencion.etiqueta === "Sin horario";
+  const mostrarHorario = sinHorario
+    ? Boolean(textoHorario)
+    : Boolean(estadoAtencion.etiqueta || textoHorario);
+  const abiertoAhora =
+    estadoAtencion.abierto === true ||
+    estadoAtencion.etiqueta === "Abierto ahora";
 
   return (
     <div className="w-full max-w-[380px] overflow-hidden rounded-[1.75rem] border border-[var(--borde)] bg-[var(--superficie)] shadow-2xl">
@@ -50,6 +67,26 @@ export default function VistaPreviaTienda({
                   {detalle}
                 </p>
               ) : null}
+              {mostrarHorario ? (
+                <div className="mt-1 flex min-w-0 items-center gap-1">
+                  {!sinHorario && estadoAtencion.etiqueta ? (
+                    <span
+                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[8px] font-extrabold ${
+                        abiertoAhora
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+                      }`}
+                    >
+                      {estadoAtencion.etiqueta}
+                    </span>
+                  ) : null}
+                  {textoHorario ? (
+                    <span className="truncate text-[9px] text-[var(--texto-suave)]">
+                      {textoHorario}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </header>
@@ -76,7 +113,7 @@ export default function VistaPreviaTienda({
                 <TarjetaProductoPublico
                   key={producto.id || producto.nombre}
                   producto={producto}
-                  enlaceWhatsapp={enlaceWhatsapp}
+                  onAbrir={setProductoSeleccionado}
                 />
               ))}
             </div>
@@ -97,6 +134,19 @@ export default function VistaPreviaTienda({
           </a>
         </div>
       ) : null}
+
+      <ModalDetalleProductoPublico
+        abierto={Boolean(productoSeleccionado)}
+        producto={productoSeleccionado}
+        contactos={{
+          nombreNegocio,
+          telefono,
+          telegram,
+          instagram,
+          correoContacto,
+        }}
+        onCerrar={() => setProductoSeleccionado(null)}
+      />
     </div>
   );
 }

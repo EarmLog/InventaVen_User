@@ -128,6 +128,10 @@ export async function asegurarDatosIniciales() {
     { clave: CLAVES_AJUSTES.COMISION_CASHEA, valor: 0 },
     { clave: CLAVES_AJUSTES.TIENDA_ACTIVA, valor: false },
     { clave: CLAVES_AJUSTES.TIENDA_PUBLICADA_EN, valor: null },
+    { clave: CLAVES_AJUSTES.TIENDA_HORARIO, valor: "" },
+    { clave: CLAVES_AJUSTES.TIENDA_TELEGRAM, valor: "" },
+    { clave: CLAVES_AJUSTES.TIENDA_INSTAGRAM, valor: "" },
+    { clave: CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO, valor: "" },
   ];
   const secuenciasIniciales = [
     { nombre: SECUENCIAS.PRODUCTOS, valor: 0 },
