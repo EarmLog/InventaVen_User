@@ -39,13 +39,6 @@ import {
 } from "@/lib/utilidades/formato";
 import VistaPreviaTienda from "./VistaPreviaTienda";
 
-const CLAVES_TIENDA_CONTACTO = {
-  HORARIO: CLAVES_AJUSTES.TIENDA_HORARIO || "tiendaHorario",
-  TELEGRAM: CLAVES_AJUSTES.TIENDA_TELEGRAM || "tiendaTelegram",
-  INSTAGRAM: CLAVES_AJUSTES.TIENDA_INSTAGRAM || "tiendaInstagram",
-  CORREO: CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO || "tiendaCorreoContacto",
-};
-
 function normalizarSlug(valor) {
   return String(valor || "")
     .trim()
@@ -158,10 +151,6 @@ export default function TiendaOnline() {
   const [slugTienda, setSlugTienda] = useState("");
   const [tokenTienda, setTokenTienda] = useState("");
   const [telefonoTienda, setTelefonoTienda] = useState("");
-  const [telegramTienda, setTelegramTienda] = useState("");
-  const [instagramTienda, setInstagramTienda] = useState("");
-  const [correoContactoTienda, setCorreoContactoTienda] = useState("");
-  const [horarioTienda, setHorarioTienda] = useState("");
   const [urlTienda, setUrlTienda] = useState("");
   const [publicandoTienda, setPublicandoTienda] = useState(false);
   const [renovandoTienda, setRenovandoTienda] = useState(false);
@@ -216,21 +205,8 @@ export default function TiendaOnline() {
     setSlugTienda(slug);
     setTokenTienda(token);
     setTelefonoTienda(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""));
-    setTelegramTienda(String(ajustes[CLAVES_TIENDA_CONTACTO.TELEGRAM] || ""));
-    setInstagramTienda(String(ajustes[CLAVES_TIENDA_CONTACTO.INSTAGRAM] || ""));
-    setCorreoContactoTienda(
-      String(ajustes[CLAVES_TIENDA_CONTACTO.CORREO] || perfil?.correo || "")
-    );
-    setHorarioTienda(String(ajustes[CLAVES_TIENDA_CONTACTO.HORARIO] || ""));
     setUrlTienda(token ? construirUrlTienda(slug, token) : "");
-  }, [ajustes, perfil?.correo]);
-
-  useEffect(() => {
-    if (!ajustesInicializados.current) return;
-    if (ajustes[CLAVES_TIENDA_CONTACTO.CORREO]) return;
-    if (!perfil?.correo) return;
-    setCorreoContactoTienda((actual) => actual || String(perfil.correo || ""));
-  }, [ajustes, perfil?.correo]);
+  }, [ajustes]);
 
   useEffect(() => {
     if (!slugTienda || !tokenTienda) {
@@ -290,19 +266,11 @@ export default function TiendaOnline() {
     const slugFinal = datos?.slug || slug;
     const token = datos?.token || tokenTienda;
     const telefono = limpiarTelefono(telefonoTienda);
-    const telegram = String(telegramTienda || "").trim();
-    const instagram = String(instagramTienda || "").trim();
-    const correoContacto = String(correoContactoTienda || "").trim();
-    const horario = String(horarioTienda || "").trim();
     const url = construirUrlTienda(slugFinal, token);
     await guardarAjuste(CLAVES_AJUSTES.TIENDA_SLUG, slugFinal);
     await guardarAjuste(CLAVES_AJUSTES.TIENDA_TOKEN, token);
     await guardarAjuste(CLAVES_AJUSTES.TIENDA_ACTIVA, true);
     await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEFONO, telefono);
-    await guardarAjuste(CLAVES_TIENDA_CONTACTO.TELEGRAM, telegram);
-    await guardarAjuste(CLAVES_TIENDA_CONTACTO.INSTAGRAM, instagram);
-    await guardarAjuste(CLAVES_TIENDA_CONTACTO.CORREO, correoContacto);
-    await guardarAjuste(CLAVES_TIENDA_CONTACTO.HORARIO, horario);
     await guardarAjuste(
       CLAVES_AJUSTES.TIENDA_PUBLICADA_EN,
       datos?.publicadaEn || new Date().toISOString()
@@ -310,10 +278,6 @@ export default function TiendaOnline() {
     setSlugTienda(slugFinal);
     setTokenTienda(token);
     setTelefonoTienda(telefono);
-    setTelegramTienda(telegram);
-    setInstagramTienda(instagram);
-    setCorreoContactoTienda(correoContacto);
-    setHorarioTienda(horario);
     setUrlTienda(url);
     setVersionCatalogo((valor) => valor + 1);
     window.dispatchEvent(new Event("inventaven-ajustes"));
@@ -377,10 +341,10 @@ export default function TiendaOnline() {
             ajustes[CLAVES_AJUSTES.NOMBRE_NEGOCIO] ||
             "Mi negocio",
           telefono: limpiarTelefono(telefonoTienda),
-          telegram: String(telegramTienda || "").trim(),
-          instagram: String(instagramTienda || "").trim(),
-          correoContacto: String(correoContactoTienda || "").trim(),
-          horario: String(horarioTienda || "").trim(),
+          telegram: String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || "").trim(),
+          instagram: String(ajustes[CLAVES_AJUSTES.TIENDA_INSTAGRAM] || "").trim(),
+          correoContacto: String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] || "").trim(),
+          horario: String(ajustes[CLAVES_AJUSTES.TIENDA_HORARIO] || "").trim(),
           tasa: Number(tasa),
           productos: productosPublicar,
         }),
@@ -517,17 +481,21 @@ export default function TiendaOnline() {
     ? telefonoTienda
     : catalogoPublico?.telefono || telefonoTienda;
   const telegramVista = usarVistaLocal
-    ? telegramTienda
-    : catalogoPublico?.telegram || telegramTienda;
+    ? String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || "").trim()
+    : catalogoPublico?.telegram ||
+      String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || "").trim();
   const instagramVista = usarVistaLocal
-    ? instagramTienda
-    : catalogoPublico?.instagram || instagramTienda;
+    ? String(ajustes[CLAVES_AJUSTES.TIENDA_INSTAGRAM] || "").trim()
+    : catalogoPublico?.instagram ||
+      String(ajustes[CLAVES_AJUSTES.TIENDA_INSTAGRAM] || "").trim();
   const correoContactoVista = usarVistaLocal
-    ? correoContactoTienda
-    : catalogoPublico?.correoContacto || correoContactoTienda;
+    ? String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] || "").trim()
+    : catalogoPublico?.correoContacto ||
+      String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] || "").trim();
   const horarioVista = usarVistaLocal
-    ? horarioTienda
-    : catalogoPublico?.horario || horarioTienda;
+    ? String(ajustes[CLAVES_AJUSTES.TIENDA_HORARIO] || "").trim()
+    : catalogoPublico?.horario ||
+      String(ajustes[CLAVES_AJUSTES.TIENDA_HORARIO] || "").trim();
   const tasaVista = Number(catalogoPublico?.tasa) > 0 ? catalogoPublico.tasa : tasa;
   const publicadaEnVista =
     catalogoPublico?.publicadaEn || fechaPublicacionTienda;
@@ -603,38 +571,6 @@ export default function TiendaOnline() {
                 placeholder="04121234567"
               />
             </Campo>
-            <Campo etiqueta="Telegram (usuario o enlace)">
-              <Entrada
-                value={telegramTienda}
-                onChange={(evento) => setTelegramTienda(evento.target.value)}
-                placeholder="@minegocio o https://t.me/minegocio"
-              />
-            </Campo>
-            <Campo etiqueta="Instagram (usuario o enlace)">
-              <Entrada
-                value={instagramTienda}
-                onChange={(evento) => setInstagramTienda(evento.target.value)}
-                placeholder="@minegocio o https://instagram.com/minegocio"
-              />
-            </Campo>
-            <Campo etiqueta="Correo de contacto">
-              <Entrada
-                type="email"
-                value={correoContactoTienda}
-                onChange={(evento) => setCorreoContactoTienda(evento.target.value)}
-                placeholder="contacto@minegocio.com"
-              />
-            </Campo>
-            <Campo
-              etiqueta="Horario de atención"
-              ayuda='Se mostrará abajo de la tasa con estado "Abierto ahora".'
-            >
-              <Entrada
-                value={horarioTienda}
-                onChange={(evento) => setHorarioTienda(evento.target.value)}
-                placeholder="Lun-Vie 08:00-18:00; Sáb 09:00-13:00; Dom Cerrado"
-              />
-            </Campo>
             <div className="flex flex-wrap gap-2">
               <Boton onClick={publicarTienda} cargando={publicandoTienda} disabled={!slugTienda}>
                 <Store className="h-4 w-4" />
@@ -658,6 +594,10 @@ export default function TiendaOnline() {
                 Abrir tienda
               </Boton>
             </div>
+            <p className="text-[11px] text-[var(--texto-suave)]">
+              Configura redes sociales y horario en Configuración, y pulsa Publicar cambios
+              para reflejarlos en el enlace público.
+            </p>
           </div>
 
           <div className="space-y-3">

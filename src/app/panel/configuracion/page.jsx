@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Building2,
+  Clock3,
   Cloud,
   CloudDownload,
   CloudUpload,
@@ -15,6 +16,7 @@ import {
   Moon,
   RefreshCw,
   RotateCcw,
+  Share2,
   Sun,
   Users,
   Wifi,
@@ -24,7 +26,7 @@ import { db } from "@/lib/db/baseDatos";
 import { useSesion } from "@/context/SesionContext";
 import { useTasa } from "@/context/TasaContext";
 import { useTema } from "@/context/TemaContext";
-import Tarjeta from "@/components/ui/Tarjeta";
+import SeccionConfiguracion from "@/components/modules/configuracion/SeccionConfiguracion";
 import Boton from "@/components/ui/Boton";
 import Campo from "@/components/ui/Campo";
 import Entrada from "@/components/ui/Entrada";
@@ -86,6 +88,8 @@ export default function PaginaConfiguracion() {
   } = useTasa();
   const { tema, cambiarTema } = useTema();
 
+  const [seccionAbierta, setSeccionAbierta] = useState("negocio");
+
   const [nombreNegocio, setNombreNegocio] = useState("");
   const [tipoCuenta, setTipoCuenta] = useState("personal");
   const [negocioRegistrado, setNegocioRegistrado] = useState(false);
@@ -93,6 +97,11 @@ export default function PaginaConfiguracion() {
   const [telefono, setTelefono] = useState("");
   const [rif, setRif] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+  const [telegramNegocio, setTelegramNegocio] = useState("");
+  const [instagramNegocio, setInstagramNegocio] = useState("");
+  const [correoContactoNegocio, setCorreoContactoNegocio] = useState("");
+  const [horarioNegocio, setHorarioNegocio] = useState("");
+  const [guardandoContacto, setGuardandoContacto] = useState(false);
   const [recalculandoPrecios, setRecalculandoPrecios] = useState(false);
   const [tasaManual, setTasaManual] = useState("");
   const [guardandoTasaManual, setGuardandoTasaManual] = useState(false);
@@ -176,6 +185,19 @@ export default function PaginaConfiguracion() {
     );
   }, [ajustes]);
 
+  useEffect(() => {
+    setTelegramNegocio(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || ""));
+    setInstagramNegocio(String(ajustes[CLAVES_AJUSTES.TIENDA_INSTAGRAM] || ""));
+    setCorreoContactoNegocio(
+      String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] ?? perfil?.correo ?? "")
+    );
+    setHorarioNegocio(String(ajustes[CLAVES_AJUSTES.TIENDA_HORARIO] || ""));
+  }, [ajustes, perfil?.correo]);
+
+  function alternarSeccion(id) {
+    setSeccionAbierta((actual) => (actual === id ? null : id));
+  }
+
   function cambiarTipoCuenta(valor) {
     setTipoCuenta(valor);
     if (valor === "personal") {
@@ -238,6 +260,30 @@ export default function PaginaConfiguracion() {
       toast.error(error.message);
     } finally {
       setGuardandoPerfil(false);
+    }
+  }
+
+  async function guardarContactoTienda() {
+    const telegram = String(telegramNegocio).trim();
+    const instagram = String(instagramNegocio).trim();
+    const correoContacto = String(correoContactoNegocio).trim();
+    const horario = String(horarioNegocio).trim();
+    setGuardandoContacto(true);
+    try {
+      await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEGRAM, telegram);
+      await guardarAjuste(CLAVES_AJUSTES.TIENDA_INSTAGRAM, instagram);
+      await guardarAjuste(CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO, correoContacto);
+      await guardarAjuste(CLAVES_AJUSTES.TIENDA_HORARIO, horario);
+      window.dispatchEvent(new Event("inventaven-ajustes"));
+      setTelegramNegocio(telegram);
+      setInstagramNegocio(instagram);
+      setCorreoContactoNegocio(correoContacto);
+      setHorarioNegocio(horario);
+      toast.success("Contacto y horario guardados.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setGuardandoContacto(false);
     }
   }
 
@@ -583,19 +629,16 @@ export default function PaginaConfiguracion() {
         </Boton>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
-              <Building2 className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Datos del negocio</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Se muestran en las facturas y en el panel.
-              </p>
-            </div>
-          </div>
+      <div className="space-y-3">
+        <SeccionConfiguracion
+          id="negocio"
+          abierto={seccionAbierta === "negocio"}
+          onAlternar={alternarSeccion}
+          icono={Building2}
+          titulo="Datos del negocio"
+          descripcion="Se muestran en las facturas y en el panel."
+          tono="primario"
+        >
           <div className="space-y-3">
             <Campo
               etiqueta="Tipo de cuenta"
@@ -697,21 +740,85 @@ export default function PaginaConfiguracion() {
               Guardar cambios
             </Boton>
           </div>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--info-suave)] text-[var(--info)]">
-              <RefreshCw className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Tasa del dólar</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Fuente automática para precios en bolívares.
-              </p>
-            </div>
+        <SeccionConfiguracion
+          id="contacto"
+          abierto={seccionAbierta === "contacto"}
+          onAlternar={alternarSeccion}
+          icono={Share2}
+          titulo="Redes sociales y horario de la tienda"
+          descripcion="Se muestran en el detalle de cada producto de tu tienda online."
+          tono="info"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Telegram" ayuda="Usuario o enlace, por ejemplo @minegocio">
+              <Entrada
+                value={telegramNegocio}
+                onChange={(evento) => setTelegramNegocio(evento.target.value)}
+                maxLength={32}
+                placeholder="@minegocio o https://t.me/minegocio"
+              />
+            </Campo>
+            <Campo etiqueta="Instagram" ayuda="Usuario o enlace, por ejemplo @minegocio">
+              <Entrada
+                value={instagramNegocio}
+                onChange={(evento) => setInstagramNegocio(evento.target.value)}
+                maxLength={60}
+                placeholder="@minegocio o https://instagram.com/minegocio"
+              />
+            </Campo>
+            <Campo
+              etiqueta="Correo de contacto"
+              ayuda="Se usa como botón Correo en el detalle del producto"
+            >
+              <Entrada
+                type="email"
+                value={correoContactoNegocio}
+                onChange={(evento) => setCorreoContactoNegocio(evento.target.value)}
+                maxLength={120}
+                placeholder="contacto@minegocio.com"
+              />
+            </Campo>
+            <Campo
+              etiqueta={
+                <>
+                  <Clock3 className="h-3.5 w-3.5" />
+                  Horario de atención
+                </>
+              }
+              ayuda="Ejemplo: Lun-Vie 08:00-18:00; Sáb 09:00-13:00; Dom Cerrado"
+              className="sm:col-span-2"
+            >
+              <Entrada
+                value={horarioNegocio}
+                onChange={(evento) => setHorarioNegocio(evento.target.value)}
+                maxLength={240}
+              />
+            </Campo>
           </div>
+          <Alerta tipo="info" className="mt-3">
+            Estos datos se guardan en este dispositivo. Para mostrarlos en el enlace
+            público, pulsa Publicar cambios en Tienda online.
+          </Alerta>
+          <Boton
+            onClick={guardarContactoTienda}
+            cargando={guardandoContacto}
+            className="mt-3 w-full"
+          >
+            Guardar contacto y horario
+          </Boton>
+        </SeccionConfiguracion>
 
+        <SeccionConfiguracion
+          id="tasa"
+          abierto={seccionAbierta === "tasa"}
+          onAlternar={alternarSeccion}
+          icono={RefreshCw}
+          titulo="Tasa del dólar"
+          descripcion="Fuente automática para precios en bolívares."
+          tono="info"
+        >
           <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-4">
             <div className="flex items-end justify-between gap-3">
               <div>
@@ -792,20 +899,17 @@ export default function PaginaConfiguracion() {
               {ultimaActualizacion ? formatearFechaHora(ultimaActualizacion) : "nunca"}
             </strong>
           </p>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--advertencia-suave)] text-[var(--advertencia)]">
-              <Users className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Deudores y Cashea</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Crédito en el POS, saldos y comisión de Cashea.
-              </p>
-            </div>
-          </div>
+        <SeccionConfiguracion
+          id="deudores"
+          abierto={seccionAbierta === "deudores"}
+          onAlternar={alternarSeccion}
+          icono={Users}
+          titulo="Deudores y Cashea"
+          descripcion="Crédito en el POS, saldos y comisión de Cashea."
+          tono="advertencia"
+        >
           <div className="space-y-4">
             <Interruptor
               activo={metodoDeudaActivo}
@@ -846,20 +950,17 @@ export default function PaginaConfiguracion() {
               </Campo>
             </div>
           </div>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300">
-              {tema === "oscuro" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Apariencia</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Elige el tema de la aplicación en este dispositivo.
-              </p>
-            </div>
-          </div>
+        <SeccionConfiguracion
+          id="apariencia"
+          abierto={seccionAbierta === "apariencia"}
+          onAlternar={alternarSeccion}
+          icono={tema === "oscuro" ? Moon : Sun}
+          titulo="Apariencia"
+          descripcion="Elige el tema de la aplicación en este dispositivo."
+          tono="violeta"
+        >
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -902,20 +1003,17 @@ export default function PaginaConfiguracion() {
               <p className="text-[10px] text-[var(--texto-tenue)]">días licencia</p>
             </div>
           </div>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--advertencia-suave)] text-[var(--advertencia)]">
-              <CloudDownload className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Copia de seguridad</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Supabase conserva las últimas 14 copias. También puedes descargar un ZIP.
-              </p>
-            </div>
-          </div>
+        <SeccionConfiguracion
+          id="respaldo"
+          abierto={seccionAbierta === "respaldo"}
+          onAlternar={alternarSeccion}
+          icono={CloudDownload}
+          titulo="Copia de seguridad"
+          descripcion="Supabase conserva las últimas 14 copias. También puedes descargar un ZIP."
+          tono="advertencia"
+        >
           <div className="space-y-2">
             <Boton
               onClick={crearCopiaNubeAhora}
@@ -992,20 +1090,17 @@ export default function PaginaConfiguracion() {
             Restaurar reemplaza el inventario y las ventas de este dispositivo. Haz una
             copia antes de continuar. La copia automática solo corre con la app abierta.
           </Alerta>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--info-suave)] text-[var(--info)]">
-              <HardDrive className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Google Drive (opcional)</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Copia diaria permanente en tu propio Drive.
-              </p>
-            </div>
-          </div>
+        <SeccionConfiguracion
+          id="drive"
+          abierto={seccionAbierta === "drive"}
+          onAlternar={alternarSeccion}
+          icono={HardDrive}
+          titulo="Google Drive (opcional)"
+          descripcion="Copia diaria permanente en tu propio Drive."
+          tono="info"
+        >
           <Alerta tipo="info" titulo="Cómo funcionará">
             Cuando conectes tu Google Drive, se guardará una copia diaria permanente en tu
             Drive. Supabase Storage seguirá guardando las últimas 14 copias para
@@ -1025,20 +1120,17 @@ export default function PaginaConfiguracion() {
               guardan en Supabase.
             </p>
           </div>
-        </Tarjeta>
+        </SeccionConfiguracion>
 
-        <Tarjeta className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--primario-suave)] text-[var(--primario-fuerte)]">
-              <Wifi className="h-4 w-4" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold">Modo sin conexión</h2>
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Deja la app guardada en este dispositivo para abrirla sin internet.
-              </p>
-            </div>
-          </div>
+        <SeccionConfiguracion
+          id="offline"
+          abierto={seccionAbierta === "offline"}
+          onAlternar={alternarSeccion}
+          icono={Wifi}
+          titulo="Modo sin conexión"
+          descripcion="Deja la app guardada en este dispositivo para abrirla sin internet."
+          tono="primario"
+        >
           <Alerta tipo="info">
             Después de prepararlo, abre InventaVen desde el acceso directo del navegador.
             Tus datos siguen guardados localmente en este equipo.
@@ -1055,55 +1147,52 @@ export default function PaginaConfiguracion() {
           <p className="mt-2 text-[10px] text-[var(--texto-tenue)]">
             En PC funciona mejor con Chrome o Edge. En teléfonos el soporte puede variar.
           </p>
-        </Tarjeta>
-      </div>
+        </SeccionConfiguracion>
 
-      <Tarjeta className="p-4 sm:p-5">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--peligro-suave)] text-[var(--peligro)]">
-            <KeyRound className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-bold">Seguridad de la cuenta</h2>
-            <p className="text-[11px] text-[var(--texto-suave)]">
-              Cambia la contraseña con la que inicias sesión.
+        <SeccionConfiguracion
+          id="seguridad"
+          abierto={seccionAbierta === "seguridad"}
+          onAlternar={alternarSeccion}
+          icono={KeyRound}
+          titulo="Seguridad de la cuenta"
+          descripcion="Cambia la contraseña con la que inicias sesión."
+          tono="peligro"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Campo etiqueta="Nueva contraseña" requerido>
+              <Entrada
+                type="password"
+                value={nuevaClave}
+                onChange={(evento) => setNuevaClave(evento.target.value)}
+                placeholder="Mínimo 8 caracteres"
+                autoComplete="new-password"
+              />
+            </Campo>
+            <Campo etiqueta="Confirmar contraseña" requerido>
+              <Entrada
+                type="password"
+                value={confirmarClave}
+                onChange={(evento) => setConfirmarClave(evento.target.value)}
+                placeholder="Repite la contraseña"
+                autoComplete="new-password"
+              />
+            </Campo>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Boton
+              onClick={cambiarContrasena}
+              cargando={cambiandoClave}
+              disabled={!nuevaClave || !confirmarClave}
+            >
+              <KeyRound className="h-4 w-4" />
+              Actualizar contraseña
+            </Boton>
+            <p className="text-[10px] text-[var(--texto-tenue)]">
+              La licencia actual es de {diasLicencia} día{diasLicencia === 1 ? "" : "s"}.
             </p>
           </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Campo etiqueta="Nueva contraseña" requerido>
-            <Entrada
-              type="password"
-              value={nuevaClave}
-              onChange={(evento) => setNuevaClave(evento.target.value)}
-              placeholder="Mínimo 8 caracteres"
-              autoComplete="new-password"
-            />
-          </Campo>
-          <Campo etiqueta="Confirmar contraseña" requerido>
-            <Entrada
-              type="password"
-              value={confirmarClave}
-              onChange={(evento) => setConfirmarClave(evento.target.value)}
-              placeholder="Repite la contraseña"
-              autoComplete="new-password"
-            />
-          </Campo>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Boton
-            onClick={cambiarContrasena}
-            cargando={cambiandoClave}
-            disabled={!nuevaClave || !confirmarClave}
-          >
-            <KeyRound className="h-4 w-4" />
-            Actualizar contraseña
-          </Boton>
-          <p className="text-[10px] text-[var(--texto-tenue)]">
-            La licencia actual es de {diasLicencia} día{diasLicencia === 1 ? "" : "s"}.
-          </p>
-        </div>
-      </Tarjeta>
+        </SeccionConfiguracion>
+      </div>
 
       <Modal
         abierto={Boolean(archivoRespaldo)}
