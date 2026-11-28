@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { ProveedorSesion } from "@/context/SesionContext";
+import { ProveedorConfiguracion } from "@/context/ConfiguracionContext";
 import { ProveedorTema } from "@/context/TemaContext";
 import ProveedorPWA from "@/components/ui/ProveedorPWA";
 
@@ -45,17 +46,19 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: scriptTema }} />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ProveedorTema>
-          <ProveedorSesion>
-            <ProveedorPWA />
-            {children}
-            <Toaster
-              position="top-right"
-              richColors
-              toastOptions={{ style: { borderRadius: "12px" } }}
-            />
-          </ProveedorSesion>
-        </ProveedorTema>
+        <ProveedorSesion>
+          <ProveedorConfiguracion>
+            <ProveedorTema>
+              <ProveedorPWA />
+              {children}
+              <Toaster
+                position="top-right"
+                richColors
+                toastOptions={{ style: { borderRadius: "12px" } }}
+              />
+            </ProveedorTema>
+          </ProveedorConfiguracion>
+        </ProveedorSesion>
       </body>
     </html>
   );

@@ -65,12 +65,9 @@ export async function GET() {
     return NextResponse.json(respuesta, {
       headers: { "Cache-Control": "public, max-age=300, s-maxage=1800" },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      {
-        error: "No se pudo obtener la tasa del dólar.",
-        detalle: error.message,
-      },
+      { error: "No se pudo obtener la tasa del dólar." },
       { status: 502 }
     );
   }

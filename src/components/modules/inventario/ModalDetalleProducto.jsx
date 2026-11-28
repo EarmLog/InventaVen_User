@@ -1,8 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
 import { Boxes, Pencil, PackagePlus } from "lucide-react";
-import { db } from "@/lib/db/baseDatos";
 import Modal from "@/components/ui/Modal";
 import Boton from "@/components/ui/Boton";
 import Etiqueta from "@/components/ui/Etiqueta";
@@ -26,15 +24,6 @@ export default function ModalDetalleProducto({
   onEditar,
   onRenovar,
 }) {
-  const imagen = useLiveQuery(
-    () =>
-      db && producto?.id
-        ? db.imagenesProducto.where("productoId").equals(producto.id).first()
-        : null,
-    [producto?.id],
-    null
-  );
-
   if (!producto) return null;
   const ganancia = calcularGanancia(
     producto.precioCompraUsd,
@@ -66,10 +55,10 @@ export default function ModalDetalleProducto({
       }
     >
       <div className="space-y-4">
-        {imagen?.datos ? (
+        {producto.imagenToken ? (
           <div className="overflow-hidden rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] sm:max-w-sm">
             <img
-              src={imagen.datos}
+              src={`/api/imagenes/ver/${producto.imagenToken}`}
               alt={`Foto de ${producto.nombre}`}
               className="h-44 w-full object-cover"
             />

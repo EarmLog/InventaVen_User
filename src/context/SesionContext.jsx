@@ -11,6 +11,8 @@ import {
 import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
 import { solicitarPerfil, traducirErrorAuth } from "@/lib/api/auth";
 import { componerNombreNegocio } from "@/lib/seguridad/validaciones";
+import { guardarAjuste } from "@/lib/db/repositorios";
+import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 
 const SesionContext = createContext(null);
 const CLAVE_SESION_OFFLINE = "inventaven-sesion-offline";
@@ -333,6 +335,7 @@ export function ProveedorSesion({ children }) {
   );
 
   const marcarOnboardingCompletado = useCallback(async () => {
+    await guardarAjuste(CLAVES_AJUSTES.ONBOARDING_VISTO, true);
     const supabase = obtenerClienteSupabase();
     const { data } = await supabase.auth.getSession();
     if (data.session) {

@@ -5,7 +5,9 @@ ALTER TABLE "InventaVen".perfiles
   ADD COLUMN IF NOT EXISTS tipo_cuenta text NOT NULL DEFAULT 'personal',
   ADD COLUMN IF NOT EXISTS negocio_registrado boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS sufijo_legal text,
-  ADD COLUMN IF NOT EXISTS rif text;
+  ADD COLUMN IF NOT EXISTS rif text,
+  ADD COLUMN IF NOT EXISTS direccion text,
+  ADD COLUMN IF NOT EXISTS zona_postal text;
 
 COMMENT ON COLUMN "InventaVen".perfiles.tipo_cuenta IS
   'Tipo de cuenta: personal, micronegocio, negocio o empresa.';

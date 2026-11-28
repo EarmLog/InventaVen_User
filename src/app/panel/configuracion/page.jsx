@@ -9,9 +9,12 @@ import {
   Cloud,
   CloudDownload,
   CloudUpload,
+  Copy,
   Download,
+  ExternalLink,
   HardDrive,
   KeyRound,
+  Link2,
   LogOut,
   Moon,
   RefreshCw,
@@ -24,6 +27,10 @@ import {
 import { toast } from "sonner";
 import { db } from "@/lib/db/baseDatos";
 import { useSesion } from "@/context/SesionContext";
+import {
+  leerRespuestaAutenticada,
+  obtenerEncabezadosAutenticados,
+} from "@/lib/api/auth";
 import { useTasa } from "@/context/TasaContext";
 import { useTema } from "@/context/TemaContext";
 import SeccionConfiguracion from "@/components/modules/configuracion/SeccionConfiguracion";
@@ -41,7 +48,11 @@ import {
   descargarRespaldoNube,
   listarRespaldosNube,
 } from "@/lib/db/respaldoNube";
-import { actualizarPreciosPorTasa, guardarAjuste } from "@/lib/db/repositorios";
+import {
+  guardarAjuste,
+  guardarAjustes,
+  recalcularPreciosYSaldosForzados,
+} from "@/lib/db/repositorios";
 import { validarContrasena } from "@/lib/seguridad/contrasena";
 import {
   componerNombreNegocio,
@@ -57,8 +68,16 @@ import {
   SUFIJOS_LEGALES_VE,
   TIPOS_CUENTA,
 } from "@/lib/utilidades/constantes";
-import { formatearFechaHora, formatearNumero, formatearVes } from "@/lib/utilidades/formato";
-import { tasaBajoSospechosa } from "@/lib/utilidades/tasa";
+import {
+  formatearFechaHora,
+  formatearNumero,
+  formatearVes,
+  limpiarTexto,
+} from "@/lib/utilidades/formato";
+import {
+  normalizarSlug,
+  urlTienda as construirUrlTienda,
+} from "@/lib/tiendaPublica";
 
 function formatearTamano(bytes) {
   const valor = Number(bytes) || 0;
@@ -85,6 +104,8 @@ export default function PaginaConfiguracion() {
     errorTasa,
     refrescarTasa,
     establecerTasaManual,
+    restablecerTasaAutomatica,
+    esManual,
   } = useTasa();
   const { tema, cambiarTema } = useTema();
 
@@ -96,15 +117,24 @@ export default function PaginaConfiguracion() {
   const [sufijoLegal, setSufijoLegal] = useState("");
   const [telefono, setTelefono] = useState("");
   const [rif, setRif] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [zonaPostal, setZonaPostal] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [telegramNegocio, setTelegramNegocio] = useState("");
   const [instagramNegocio, setInstagramNegocio] = useState("");
   const [correoContactoNegocio, setCorreoContactoNegocio] = useState("");
   const [horarioNegocio, setHorarioNegocio] = useState("");
+  const [telefonoTienda, setTelefonoTienda] = useState("");
   const [guardandoContacto, setGuardandoContacto] = useState(false);
+  const [slugTienda, setSlugTienda] = useState("");
+  const [tokenTienda, setTokenTienda] = useState("");
+  const [urlTienda, setUrlTienda] = useState("");
+  const [guardandoEnlace, setGuardandoEnlace] = useState(false);
+  const [renovandoEnlace, setRenovandoEnlace] = useState(false);
   const [recalculandoPrecios, setRecalculandoPrecios] = useState(false);
   const [tasaManual, setTasaManual] = useState("");
   const [guardandoTasaManual, setGuardandoTasaManual] = useState(false);
+  const [modalBajadaAbierto, setModalBajadaAbierto] = useState(false);
 
   const [nuevaClave, setNuevaClave] = useState("");
   const [confirmarClave, setConfirmarClave] = useState("");
@@ -151,8 +181,6 @@ export default function PaginaConfiguracion() {
     ) || {};
   const autoPrecios = Boolean(ajustes[CLAVES_AJUSTES.ACTUALIZAR_PRECIOS_AUTO]);
   const ultimaActualizacion = ajustes[CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS];
-  const ultimaTasaAplicada =
-    Number(ajustes[CLAVES_AJUSTES.TASA_ULTIMA_APLICADA]) || 0;
   const diasLicencia = Number(perfil?.diasLicencia ?? 0);
   const copiaNubeActiva = Boolean(ajustes[CLAVES_AJUSTES.COPIA_NUBE_ACTIVA]);
   const ultimaCopiaNube = ajustes[CLAVES_AJUSTES.COPIA_NUBE_ULTIMA];
@@ -169,6 +197,8 @@ export default function PaginaConfiguracion() {
     setSufijoLegal(perfil?.sufijoLegal || sufijo || "");
     setTelefono(perfil?.telefono || "");
     setRif(perfil?.rif || ajustes[CLAVES_AJUSTES.RIF_NEGOCIO] || "");
+    setDireccion(perfil?.direccion || "");
+    setZonaPostal(perfil?.zonaPostal || "");
   }, [perfil, ajustes]);
 
   useEffect(() => {
@@ -192,6 +222,12 @@ export default function PaginaConfiguracion() {
       String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] ?? perfil?.correo ?? "")
     );
     setHorarioNegocio(String(ajustes[CLAVES_AJUSTES.TIENDA_HORARIO] || ""));
+    setTelefonoTienda(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""));
+    const slug = String(ajustes[CLAVES_AJUSTES.TIENDA_SLUG] || "");
+    const token = String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
+    setSlugTienda(slug);
+    setTokenTienda(token);
+    setUrlTienda(token && slug ? construirUrlTienda(slug, token) : "");
   }, [ajustes, perfil?.correo]);
 
   function alternarSeccion(id) {
@@ -202,8 +238,6 @@ export default function PaginaConfiguracion() {
     setTipoCuenta(valor);
     if (valor === "personal") {
       setNegocioRegistrado(false);
-      setSufijoLegal("");
-      setRif("");
     } else if (valor === "empresa") {
       setNegocioRegistrado(true);
     }
@@ -246,6 +280,8 @@ export default function PaginaConfiguracion() {
         tipoCuenta,
         negocioRegistrado,
         sufijoLegal,
+        direccion,
+        zonaPostal,
       });
       await guardarAjuste(
         CLAVES_AJUSTES.NOMBRE_NEGOCIO,
@@ -268,23 +304,100 @@ export default function PaginaConfiguracion() {
     const instagram = String(instagramNegocio).trim();
     const correoContacto = String(correoContactoNegocio).trim();
     const horario = String(horarioNegocio).trim();
+    const errorTelefono = validarTelefonoVe(telefonoTienda, { obligatorio: false });
+    if (errorTelefono) {
+      toast.error(errorTelefono);
+      return;
+    }
+    const telefono = limpiarTelefono(telefonoTienda);
     setGuardandoContacto(true);
     try {
       await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEGRAM, telegram);
       await guardarAjuste(CLAVES_AJUSTES.TIENDA_INSTAGRAM, instagram);
       await guardarAjuste(CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO, correoContacto);
       await guardarAjuste(CLAVES_AJUSTES.TIENDA_HORARIO, horario);
+      await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEFONO, telefono);
       window.dispatchEvent(new Event("inventaven-ajustes"));
       setTelegramNegocio(telegram);
       setInstagramNegocio(instagram);
       setCorreoContactoNegocio(correoContacto);
       setHorarioNegocio(horario);
+      setTelefonoTienda(telefono);
       toast.success("Contacto y horario guardados.");
     } catch (error) {
       toast.error(error.message);
     } finally {
       setGuardandoContacto(false);
     }
+  }
+
+  async function guardarEnlaceTienda(rotarToken = false) {
+    const slug = normalizarSlug(slugTienda);
+    if (!slug) {
+      toast.error("Escribe un nombre válido para el enlace de la tienda.");
+      return;
+    }
+    const errorTelefono = validarTelefonoVe(telefonoTienda, { obligatorio: false });
+    if (errorTelefono) {
+      toast.error(errorTelefono);
+      return;
+    }
+    if (rotarToken) setRenovandoEnlace(true);
+    else setGuardandoEnlace(true);
+    try {
+      const encabezados = await obtenerEncabezadosAutenticados();
+      const respuesta = await fetch("/api/tienda/enlace", {
+        method: "PATCH",
+        headers: encabezados,
+        body: JSON.stringify({ slug, rotarToken }),
+      });
+      const datos = await leerRespuestaAutenticada(respuesta);
+      const telefono = limpiarTelefono(telefonoTienda);
+      await guardarAjustes({
+        [CLAVES_AJUSTES.TIENDA_SLUG]: datos.slug,
+        [CLAVES_AJUSTES.TIENDA_TOKEN]: datos.token,
+        [CLAVES_AJUSTES.TIENDA_ACTIVA]: true,
+        [CLAVES_AJUSTES.TIENDA_TELEFONO]: telefono,
+        [CLAVES_AJUSTES.TIENDA_PUBLICADA_EN]:
+          datos.publicadaEn || new Date().toISOString(),
+      });
+      setSlugTienda(datos.slug);
+      setTokenTienda(datos.token);
+      setTelefonoTienda(telefono);
+      setUrlTienda(datos.url);
+      window.dispatchEvent(new Event("inventaven-ajustes"));
+      toast.success(
+        rotarToken
+          ? "Enlace renovado: el anterior ya no será válido."
+          : "Dirección de la tienda guardada."
+      );
+    } catch (error) {
+      toast.error(error.message || "No se pudo guardar el enlace.");
+    } finally {
+      setGuardandoEnlace(false);
+      setRenovandoEnlace(false);
+    }
+  }
+
+  async function copiarEnlaceTienda() {
+    if (!urlTienda) {
+      toast.error("Aún no hay un enlace público.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(urlTienda);
+      toast.success("Enlace copiado al portapapeles.");
+    } catch {
+      toast.error("No se pudo copiar el enlace.");
+    }
+  }
+
+  function abrirEnlaceTienda() {
+    if (!urlTienda) {
+      toast.error("Aún no hay un enlace público.");
+      return;
+    }
+    window.open(urlTienda, "_blank", "noopener,noreferrer");
   }
 
   async function alternarAutoPrecios(activo) {
@@ -369,23 +482,27 @@ export default function PaginaConfiguracion() {
     }
   }
 
-  async function recalcularPreciosAhora() {
-    if (ultimaTasaAplicada > 0 && tasaBajoSospechosa(tasa, ultimaTasaAplicada)) {
-      toast.error(
-        "La tasa actual bajó 10% o más respecto a la última aplicada. Los precios no se actualizaron para protegerlos."
-      );
-      return;
-    }
+  async function aplicarBajadaManual() {
     setRecalculandoPrecios(true);
     try {
-      const actualizados = await actualizarPreciosPorTasa(tasa);
+      const resultado = await recalcularPreciosYSaldosForzados(tasa);
+      setModalBajadaAbierto(false);
       toast.success(
-        `Precios recalculados en bolívares con la tasa de ${formatearVes(tasa)} (${actualizados} productos).`
+        `Bajada aplicada con ${formatearVes(tasa)} por USD: ${resultado.productos} productos y ${resultado.deudas} saldos recalculados.`
       );
     } catch (error) {
       toast.error(error.message);
     } finally {
       setRecalculandoPrecios(false);
+    }
+  }
+
+  async function restaurarTasaAutomatica() {
+    try {
+      await restablecerTasaAutomatica();
+      toast.success("La tasa automática vuelve a estar activa.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo restaurar la tasa automática.");
     }
   }
 
@@ -729,6 +846,26 @@ export default function PaginaConfiguracion() {
                 placeholder="04121234567"
               />
             </Campo>
+            <Campo etiqueta="Dirección" ayuda="Dirección fiscal o física del negocio.">
+              <Entrada
+                value={direccion}
+                onChange={(evento) =>
+                  setDireccion(limpiarTexto(evento.target.value, 200))
+                }
+                maxLength={200}
+                placeholder="Calle, número, localidad"
+              />
+            </Campo>
+            <Campo etiqueta="Zona postal" ayuda="Código postal o zona de entrega.">
+              <Entrada
+                value={zonaPostal}
+                onChange={(evento) =>
+                  setZonaPostal(limpiarTexto(evento.target.value, 20))
+                }
+                maxLength={20}
+                placeholder="1060"
+              />
+            </Campo>
             <div className="flex items-center justify-between rounded-xl bg-[var(--superficie-2)] px-3 py-2 text-[11px]">
               <span className="text-[var(--texto-suave)]">Correo de la cuenta</span>
               <strong>{perfil?.correo || "—"}</strong>
@@ -781,6 +918,18 @@ export default function PaginaConfiguracion() {
               />
             </Campo>
             <Campo
+              etiqueta="WhatsApp de la tienda"
+              ayuda="Solo números, sin espacios ni guiones."
+            >
+              <Entrada
+                value={telefonoTienda}
+                onChange={(evento) => setTelefonoTienda(limpiarTelefono(evento.target.value))}
+                maxLength={13}
+                inputMode="numeric"
+                placeholder="04121234567"
+              />
+            </Campo>
+            <Campo
               etiqueta={
                 <>
                   <Clock3 className="h-3.5 w-3.5" />
@@ -798,8 +947,8 @@ export default function PaginaConfiguracion() {
             </Campo>
           </div>
           <Alerta tipo="info" className="mt-3">
-            Estos datos se guardan en este dispositivo. Para mostrarlos en el enlace
-            público, pulsa Publicar cambios en Tienda online.
+            Estos datos se guardan en tu configuración y se sincronizan entre dispositivos.
+            Para mostrarlos en el enlace público, pulsa Publicar cambios en Tienda online.
           </Alerta>
           <Boton
             onClick={guardarContactoTienda}
@@ -811,12 +960,86 @@ export default function PaginaConfiguracion() {
         </SeccionConfiguracion>
 
         <SeccionConfiguracion
+          id="enlace"
+          abierto={seccionAbierta === "enlace"}
+          onAlternar={alternarSeccion}
+          icono={Link2}
+          titulo="Enlace de la tienda"
+          descripcion="Dirección pública y renovación de seguridad del enlace."
+          tono="info"
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-3">
+              <Campo
+                etiqueta="Slug de la tienda"
+                ayuda="Solo letras, números y guiones. Los cambios se aplican al guardar o al renovar."
+              >
+                <Entrada
+                  value={slugTienda}
+                  onChange={(evento) => setSlugTienda(normalizarSlug(evento.target.value))}
+                  maxLength={60}
+                  placeholder="mi-tienda"
+                />
+              </Campo>
+              <div className="flex flex-wrap gap-2">
+                <Boton
+                  onClick={() => guardarEnlaceTienda(false)}
+                  cargando={guardandoEnlace}
+                  disabled={!slugTienda || renovandoEnlace}
+                >
+                  <Link2 className="h-4 w-4" />
+                  Guardar enlace
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={() => guardarEnlaceTienda(true)}
+                  cargando={renovandoEnlace}
+                  disabled={!slugTienda || !tokenTienda || guardandoEnlace}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Renovar link
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={copiarEnlaceTienda}
+                  disabled={!urlTienda}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar link
+                </Boton>
+                <Boton
+                  variante="secundario"
+                  onClick={abrirEnlaceTienda}
+                  disabled={!urlTienda}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Abrir tienda
+                </Boton>
+              </div>
+              <p className="text-[11px] text-[var(--texto-suave)]">
+                Renovar link cambia el token: el enlace anterior dejará de funcionar. Publicar
+                cambios sigue en Tienda online.
+              </p>
+            </div>
+            <div className="space-y-1 rounded-xl border border-[var(--borde)] bg-[var(--superficie-2)] px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--texto-suave)]">
+                <Link2 className="h-3 w-3" />
+                Enlace público
+              </p>
+              <p className="break-all font-mono text-[11px]">
+                {urlTienda || "Publica la tienda para generar el enlace."}
+              </p>
+            </div>
+          </div>
+        </SeccionConfiguracion>
+
+        <SeccionConfiguracion
           id="tasa"
           abierto={seccionAbierta === "tasa"}
           onAlternar={alternarSeccion}
           icono={RefreshCw}
           titulo="Tasa del dólar"
-          descripcion="Fuente automática para precios en bolívares."
+          descripcion="Tasa vigente con bajadas controladas y tasa manual persistente."
           tono="info"
         >
           <div className="rounded-2xl border border-[var(--borde)] bg-[var(--superficie-2)] p-4">
@@ -845,10 +1068,18 @@ export default function PaginaConfiguracion() {
             {errorTasa ? (
               <p className="mt-1 text-[10px] text-[var(--advertencia)]">{errorTasa}</p>
             ) : null}
+            {esManual ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Etiqueta variante="advertencia">Usando tasa manual</Etiqueta>
+                <Boton variante="secundario" tamano="sm" onClick={restaurarTasaAutomatica}>
+                  Usar tasa automática
+                </Boton>
+              </div>
+            ) : null}
             <div className="mt-3 border-t border-[var(--borde)] pt-3">
               <Campo
                 etiqueta="Tasa manual (VES por USD)"
-                ayuda="Úsala solo si la tasa automática falla o si necesitas corregirla. No se aplica a los precios automáticamente si baja 10% o más."
+                ayuda="La tasa manual se guarda en tu configuración y se mantiene en todos tus dispositivos. Las bajadas automáticas están bloqueadas."
               >
                 <div className="flex gap-2">
                   <Entrada
@@ -880,16 +1111,16 @@ export default function PaginaConfiguracion() {
             />
             <div className="flex flex-wrap items-center gap-2">
               <Boton
-                variante="secundario"
+                variante="peligroSuave"
                 tamano="sm"
-                onClick={recalcularPreciosAhora}
-                cargando={recalculandoPrecios}
+                onClick={() => setModalBajadaAbierto(true)}
+                disabled={!Number(tasa) || recalculandoPrecios}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                Recalcular precios ahora
+                Aplicar cambio de tasa a precios y saldos
               </Boton>
               <p className="text-[10px] text-[var(--texto-suave)]">
-                Se recalculan los precios en bolívares a partir de los equivalentes en dólares con la tasa vigente.
+                Las subidas se aplican automáticamente. Para bajar precios o saldos, confirma aquí de forma explícita.
               </p>
             </div>
           </div>
@@ -1193,6 +1424,45 @@ export default function PaginaConfiguracion() {
           </div>
         </SeccionConfiguracion>
       </div>
+
+      <Modal
+        abierto={modalBajadaAbierto}
+        onCerrar={() => {
+          if (!recalculandoPrecios) setModalBajadaAbierto(false);
+        }}
+        titulo="Aplicar cambio de tasa"
+        descripcion="Confirmación manual de bajada"
+        ancho="sm"
+        bloqueado={recalculandoPrecios}
+        pie={
+          <>
+            <Boton
+              variante="secundario"
+              onClick={() => setModalBajadaAbierto(false)}
+              disabled={recalculandoPrecios}
+            >
+              Cancelar
+            </Boton>
+            <Boton
+              variante="peligro"
+              onClick={aplicarBajadaManual}
+              cargando={recalculandoPrecios}
+            >
+              Confirmar y aplicar
+            </Boton>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Alerta tipo="advertencia" titulo="Puede reducir precios y saldos">
+            La tasa vigente es {formatearVes(tasa)} por USD. Solo confirma si deseas recalcular
+            precios en bolívares y saldos de deudas con este valor, incluso si es menor al anterior.
+          </Alerta>
+          <p className="text-xs text-[var(--texto-suave)]">
+            Las subidas automáticas seguirán activas. Esta confirmación queda registrada solo en esta sesión.
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         abierto={Boolean(archivoRespaldo)}

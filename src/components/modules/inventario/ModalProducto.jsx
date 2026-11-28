@@ -13,12 +13,11 @@ import Alerta from "@/components/ui/Alerta";
 import Etiqueta from "@/components/ui/Etiqueta";
 import ModalEscanerCamara from "@/components/ui/ModalEscanerCamara";
 import ModalEmparejamientoQR from "@/components/ui/ModalEmparejamientoQR";
+import { guardarProducto } from "@/lib/db/repositorios";
 import {
-  guardarProducto,
-  guardarImagenProducto,
-  obtenerImagenProducto,
-  eliminarImagenProducto,
-} from "@/lib/db/repositorios";
+  leerRespuestaAutenticada,
+  obtenerEncabezadosAutenticados,
+} from "@/lib/api/auth";
 import { comprimirImagen } from "@/lib/utilidades/imagenes";
 import { db } from "@/lib/db/baseDatos";
 import { reproducirPitidoExito } from "@/lib/utilidades/audio";
@@ -123,20 +122,12 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
     setFotoInfo(null);
     setFotoPendiente(false);
     if (producto?.id) {
-      (async () => {
-        try {
-          const imagen = await obtenerImagenProducto(producto.id);
-          setFoto(imagen?.datos || null);
-          setFotoInfo(
-            imagen
-              ? { mime: imagen.mime, ancho: imagen.ancho, alto: imagen.alto }
-              : null
-          );
-        } catch (err) {
-          setError(err.message);
-          toast.error(err.message);
-        }
-      })();
+      setFoto(
+        producto.imagenToken
+          ? `/api/imagenes/ver/${producto.imagenToken}`
+          : null
+      );
+      setFotoInfo(null);
     } else {
       (async () => {
         const secuencia = db ? await db.secuencias.get(SECUENCIAS.PRODUCTOS) : null;
@@ -250,7 +241,14 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
     setError("");
     try {
       if (producto?.id) {
-        await eliminarImagenProducto(producto.id);
+        const encabezados = await obtenerEncabezadosAutenticados();
+        const respuesta = await fetch("/api/imagenes/producto", {
+          method: "DELETE",
+          headers: encabezados,
+          body: JSON.stringify({ productoId: producto.id }),
+        });
+        await leerRespuestaAutenticada(respuesta);
+        await guardarProducto({ ...producto, imagenToken: null, imagenRuta: null });
       }
       setFoto(null);
       setFotoInfo(null);
@@ -345,19 +343,35 @@ export default function ModalProducto({ abierto, producto, tasa, onCerrar, onGua
         stockMinimo: limpiarNumero(formulario.stockMinimo, 0),
         activo: formulario.activo,
         visibleTienda: formulario.visibleTienda,
+        imagenToken: foto ? producto?.imagenToken || null : null,
+        imagenRuta: null,
         ofertaActiva: formulario.ofertaActiva,
         ofertaCantidad: formulario.ofertaCantidad,
         ofertaDescuento: formulario.ofertaDescuento,
         variantes,
       });
       if (foto && fotoPendiente && guardado?.id) {
-        await guardarImagenProducto({
-          productoId: guardado.id,
-          datos: foto,
-          mime: fotoInfo?.mime || "image/jpeg",
-          ancho: fotoInfo?.ancho || 0,
-          alto: fotoInfo?.alto || 0,
-        });
+        try {
+          const encabezados = await obtenerEncabezadosAutenticados();
+          const respuesta = await fetch("/api/imagenes/producto", {
+            method: "POST",
+            headers: encabezados,
+            body: JSON.stringify({
+              productoId: guardado.id,
+              imagenBase64: foto,
+            }),
+          });
+          const datos = await leerRespuestaAutenticada(respuesta);
+          await guardarProducto({
+            ...guardado,
+            imagenToken: datos.token,
+            imagenRuta: null,
+          });
+        } catch (err) {
+          toast.error(
+            `Producto guardado, pero la foto no pudo subir: ${err.message}`
+          );
+        }
       }
       toast.success(
         esEdicion

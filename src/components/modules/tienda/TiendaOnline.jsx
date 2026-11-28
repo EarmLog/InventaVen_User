@@ -1,24 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  Copy,
-  ExternalLink,
   Globe,
   Link2,
   MessageCircle,
   PackageOpen,
-  RefreshCw,
   Search,
   Send,
   Store,
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/db/baseDatos";
-import { guardarAjuste } from "@/lib/db/repositorios";
-import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
+import { guardarAjustes } from "@/lib/db/repositorios";
 import { useSesion } from "@/context/SesionContext";
+import {
+  leerRespuestaAutenticada,
+  obtenerEncabezadosAutenticados,
+} from "@/lib/api/auth";
 import { useTasa } from "@/context/TasaContext";
 import Tarjeta from "@/components/ui/Tarjeta";
 import Boton from "@/components/ui/Boton";
@@ -29,8 +29,7 @@ import Etiqueta from "@/components/ui/Etiqueta";
 import Interruptor from "@/components/ui/Interruptor";
 import Alerta from "@/components/ui/Alerta";
 import EstadoVacio from "@/components/ui/EstadoVacio";
-import { limpiarTelefono, validarTelefonoVe } from "@/lib/seguridad/validaciones";
-import { normalizarSlug } from "@/lib/tiendaPublica";
+import { normalizarSlug, urlTienda as construirUrlTienda } from "@/lib/tiendaPublica";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 import {
   formatearFechaHora,
@@ -40,25 +39,10 @@ import {
 } from "@/lib/utilidades/formato";
 import VistaPreviaTienda from "./VistaPreviaTienda";
 
-function imagenABase64(datos) {
-  const texto = String(datos || "");
-  if (!texto) return "";
-  const coma = texto.indexOf(",");
-  return coma >= 0 ? texto.slice(coma + 1) : texto;
-}
-
-function construirUrlTienda(slug, token) {
-  if (typeof window === "undefined") return "";
-  const base = `${window.location.origin}/tienda/${encodeURIComponent(slug || "")}`;
-  return token ? `${base}/${encodeURIComponent(token)}` : base;
-}
-
-function imagenParaVista(registro) {
-  const datos = String(registro?.datos || "");
-  if (!datos) return "";
-  if (datos.startsWith("data:")) return datos;
-  const mime = /^image\//.test(String(registro?.mime || "")) ? registro.mime : "image/jpeg";
-  return `data:${mime};base64,${datos}`;
+function imagenParaVista(producto) {
+  const token = String(producto?.imagenToken || "");
+  if (!/^[0-9a-f]{48}$/i.test(token)) return "";
+  return `/api/imagenes/ver/${token}`;
 }
 
 function textoBusqueda(producto) {
@@ -74,26 +58,6 @@ function textoBusqueda(producto) {
   ]
     .join(" ")
     .toLowerCase();
-}
-
-async function obtenerEncabezadosAutenticados() {
-  const supabase = obtenerClienteSupabase();
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data?.session?.access_token) {
-    throw new Error("Inicia sesión nuevamente para publicar la tienda.");
-  }
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${data.session.access_token}`,
-  };
-}
-
-async function leerRespuesta(respuesta) {
-  const datos = await respuesta.json().catch(() => ({}));
-  if (!respuesta.ok) {
-    throw new Error(datos.error || datos.mensaje || "No se pudo completar la solicitud.");
-  }
-  return datos;
 }
 
 function Miniatura({ imagenUrl }) {
@@ -135,16 +99,9 @@ export default function TiendaOnline() {
     ) || {};
   const productos =
     useLiveQuery(() => (db ? db.productos.toArray() : []), [], []) || [];
-  const imagenes =
-    useLiveQuery(() => (db ? db.imagenesProducto.toArray() : []), [], []) || [];
-
-  const [slugTienda, setSlugTienda] = useState("");
-  const [slugPublicado, setSlugPublicado] = useState("");
-  const [tokenTienda, setTokenTienda] = useState("");
-  const [telefonoTienda, setTelefonoTienda] = useState("");
-  const [urlTienda, setUrlTienda] = useState("");
+  const slugTienda = normalizarSlug(String(ajustes[CLAVES_AJUSTES.TIENDA_SLUG] || ""));
+  const tokenTienda = String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
   const [publicandoTienda, setPublicandoTienda] = useState(false);
-  const [renovandoTienda, setRenovandoTienda] = useState(false);
   const [catalogoPublico, setCatalogoPublico] = useState(null);
   const [cargandoCatalogo, setCargandoCatalogo] = useState(false);
   const [errorCatalogo, setErrorCatalogo] = useState("");
@@ -154,12 +111,6 @@ export default function TiendaOnline() {
   const [categoria, setCategoria] = useState("");
   const [estado, setEstado] = useState("todos");
   const [guardandoId, setGuardandoId] = useState("");
-  const ajustesInicializados = useRef(false);
-
-  const imagenesPorProducto = useMemo(
-    () => new Map(imagenes.map((imagen) => [imagen.productoId, imagen])),
-    [imagenes]
-  );
   const categorias = useMemo(
     () =>
       Array.from(
@@ -187,22 +138,8 @@ export default function TiendaOnline() {
   ).length;
   const fechaPublicacionTienda = ajustes[CLAVES_AJUSTES.TIENDA_PUBLICADA_EN];
   const urlVisible =
-    slugTienda && tokenTienda ? construirUrlTienda(slugTienda, tokenTienda) : urlTienda;
-  const slugPendiente = Boolean(
-    slugTienda && slugPublicado && normalizarSlug(slugTienda) !== slugPublicado
-  );
-
-  useEffect(() => {
-    if (ajustesInicializados.current || !Object.keys(ajustes).length) return;
-    ajustesInicializados.current = true;
-    const slug = String(ajustes[CLAVES_AJUSTES.TIENDA_SLUG] || "");
-    const token = String(ajustes[CLAVES_AJUSTES.TIENDA_TOKEN] || "");
-    setSlugTienda(slug);
-    setSlugPublicado(slug);
-    setTokenTienda(token);
-    setTelefonoTienda(String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""));
-    setUrlTienda(token ? construirUrlTienda(slug, token) : "");
-  }, [ajustes]);
+    slugTienda && tokenTienda ? construirUrlTienda(slugTienda, tokenTienda) : "";
+  const slugPublicado = slugTienda;
 
   useEffect(() => {
     if (!slugPublicado || !tokenTienda) {
@@ -261,35 +198,25 @@ export default function TiendaOnline() {
   async function guardarRespuestaTienda(datos, slug) {
     const slugFinal = datos?.slug || slug;
     const token = datos?.token || tokenTienda;
-    const telefono = limpiarTelefono(telefonoTienda);
-    const url = construirUrlTienda(slugFinal, token);
-    await guardarAjuste(CLAVES_AJUSTES.TIENDA_SLUG, slugFinal);
-    await guardarAjuste(CLAVES_AJUSTES.TIENDA_TOKEN, token);
-    await guardarAjuste(CLAVES_AJUSTES.TIENDA_ACTIVA, true);
-    await guardarAjuste(CLAVES_AJUSTES.TIENDA_TELEFONO, telefono);
-    await guardarAjuste(
-      CLAVES_AJUSTES.TIENDA_PUBLICADA_EN,
-      datos?.publicadaEn || new Date().toISOString()
-    );
-    setSlugTienda(slugFinal);
-    setSlugPublicado(slugFinal);
-    setTokenTienda(token);
-    setTelefonoTienda(telefono);
-    setUrlTienda(url);
+    await guardarAjustes({
+      [CLAVES_AJUSTES.TIENDA_SLUG]: slugFinal,
+      [CLAVES_AJUSTES.TIENDA_TOKEN]: token,
+      [CLAVES_AJUSTES.TIENDA_ACTIVA]: true,
+      [CLAVES_AJUSTES.TIENDA_PUBLICADA_EN]:
+        datos?.publicadaEn || new Date().toISOString(),
+    });
     setVersionCatalogo((valor) => valor + 1);
     window.dispatchEvent(new Event("inventaven-ajustes"));
-    return url;
   }
 
   async function publicarTienda() {
-    const slug = normalizarSlug(slugTienda);
+    const slug = slugTienda;
     if (!slug) {
-      toast.error("Escribe un slug para la tienda online.");
+      toast.error("Configura el enlace de la tienda antes de publicar.");
       return;
     }
-    const errorTelefono = validarTelefonoVe(telefonoTienda, { obligatorio: false });
-    if (errorTelefono) {
-      toast.error(errorTelefono);
+    if (!productos.length) {
+      toast.error("No hay productos en el catálogo local para publicar.");
       return;
     }
     if (!(Number(tasa) > 0)) {
@@ -308,9 +235,7 @@ export default function TiendaOnline() {
           categoria: producto.categoria || "Otros",
           precioUsd: Number(producto.precioVentaUsd) || 0,
           precioVes: Number(producto.precioVentaVes) || 0,
-          imagenBase64: imagenABase64(
-            imagenesPorProducto.get(producto.id)?.datos
-          ),
+          imagenToken: producto.imagenToken || null,
           sku: producto.sku || "",
           stock: Number(producto.stock) || 0,
           variantes: Array.isArray(producto.variantes)
@@ -337,7 +262,7 @@ export default function TiendaOnline() {
             perfil?.nombreNegocio ||
             ajustes[CLAVES_AJUSTES.NOMBRE_NEGOCIO] ||
             "Mi negocio",
-          telefono: limpiarTelefono(telefonoTienda),
+          telefono: String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || ""),
           telegram: String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || "").trim(),
           instagram: String(ajustes[CLAVES_AJUSTES.TIENDA_INSTAGRAM] || "").trim(),
           correoContacto: String(ajustes[CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO] || "").trim(),
@@ -346,7 +271,7 @@ export default function TiendaOnline() {
           productos: productosPublicar,
         }),
       });
-      const datos = await leerRespuesta(respuesta);
+      const datos = await leerRespuestaAutenticada(respuesta);
       await guardarRespuestaTienda(datos, slug);
       toast.success(
         `Tienda publicada con ${formatearNumero(
@@ -360,73 +285,6 @@ export default function TiendaOnline() {
     }
   }
 
-  async function renovarLinkTienda() {
-    if (!tokenTienda) {
-      toast.error("Primero publica la tienda para poder renovar el enlace.");
-      return;
-    }
-    const slugNormalizado = normalizarSlug(slugTienda);
-    if (!slugNormalizado) {
-      toast.error("Escribe un slug válido para renovar el enlace.");
-      return;
-    }
-    setRenovandoTienda(true);
-    try {
-      const encabezados = await obtenerEncabezadosAutenticados();
-      const respuesta = await fetch("/api/tienda/renovar", {
-        method: "POST",
-        headers: encabezados,
-        body: JSON.stringify({ slug: slugNormalizado }),
-      });
-      const datos = await leerRespuesta(respuesta);
-      await guardarRespuestaTienda(datos, slugNormalizado);
-      toast.success("Enlace de la tienda renovado correctamente.");
-    } catch (error) {
-      toast.error(error.message || "No se pudo renovar el enlace.");
-    } finally {
-      setRenovandoTienda(false);
-    }
-  }
-
-  function abrirTienda() {
-    if (!urlVisible) {
-      toast.error("Publica la tienda para obtener un enlace.");
-      return;
-    }
-    window.open(urlVisible, "_blank", "noopener,noreferrer");
-  }
-
-  async function copiarLinkTienda() {
-    if (!urlVisible) {
-      toast.error("Publica la tienda para obtener un enlace.");
-      return;
-    }
-    let copiado = false;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(urlVisible);
-        copiado = true;
-      }
-    } catch {
-      copiado = false;
-    }
-    if (!copiado) {
-      const area = document.createElement("textarea");
-      area.value = urlVisible;
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      document.body.appendChild(area);
-      area.select();
-      copiado = document.execCommand("copy");
-      area.remove();
-    }
-    if (copiado) {
-      toast.success("Enlace copiado al portapapeles.");
-      return;
-    }
-    toast.error("No se pudo copiar el enlace.");
-  }
-
   function compartirTienda(red) {
     if (!urlVisible) {
       toast.error("Publica la tienda para poder compartirla.");
@@ -435,7 +293,7 @@ export default function TiendaOnline() {
     const texto = `Mira los productos de ${
       perfil?.nombreNegocio || "mi negocio"
     }: ${urlVisible}`;
-    const telefono = limpiarTelefono(telefonoTienda);
+    const telefono = String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || "");
     let destino = "";
     if (red === "whatsapp") {
       destino = telefono
@@ -481,8 +339,8 @@ export default function TiendaOnline() {
     ajustes[CLAVES_AJUSTES.NOMBRE_NEGOCIO] ||
     "Mi negocio";
   const telefonoVista = usarVistaLocal
-    ? telefonoTienda
-    : catalogoPublico?.telefono || telefonoTienda;
+    ? String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || "")
+    : catalogoPublico?.telefono || String(ajustes[CLAVES_AJUSTES.TIENDA_TELEFONO] || "");
   const telegramVista = usarVistaLocal
     ? String(ajustes[CLAVES_AJUSTES.TIENDA_TELEGRAM] || "").trim()
     : catalogoPublico?.telegram ||
@@ -512,7 +370,7 @@ export default function TiendaOnline() {
           categoria: producto.categoria || "Otros",
           precioUsd: Number(producto.precioVentaUsd) || 0,
           precioVes: Number(producto.precioVentaVes) || 0,
-          imagenUrl: imagenParaVista(imagenesPorProducto.get(producto.id)),
+          imagenUrl: imagenParaVista(producto),
         }))
     : Array.isArray(catalogoPublico?.productos)
       ? catalogoPublico.productos
@@ -533,80 +391,29 @@ export default function TiendaOnline() {
             <Store className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="text-sm font-bold">Enlace y compartir</h2>
+            <h2 className="text-sm font-bold">Publicación de la tienda</h2>
             <p className="text-[11px] text-[var(--texto-suave)]">
-              Configura la dirección pública de tu tienda y compártela.
+              Publica el catálogo y comparte el enlace configurado en Configuración.
             </p>
           </div>
         </div>
 
         {enlaceInvalido ? (
           <Alerta tipo="error" titulo="El enlace guardado fue invalidado" className="mb-4">
-            El enlace público ya no está disponible. Renueva el link o publica la tienda de
-            nuevo para generar un acceso válido.
+            El enlace público ya no está disponible. Renueva el link desde Configuración
+            o publica la tienda de nuevo para generar un acceso válido.
           </Alerta>
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-3">
-            <Campo
-              etiqueta="Slug de la tienda"
-              ayuda="Se usa en el enlace público. Solo letras, números y guiones."
-            >
-              <Entrada
-                value={slugTienda}
-                onChange={(evento) => setSlugTienda(normalizarSlug(evento.target.value))}
-                placeholder="mi-tienda"
-                maxLength={48}
-              />
-            </Campo>
-            <Campo
-              etiqueta="Teléfono de WhatsApp (opcional)"
-              ayuda="Solo números, sin espacios ni guiones."
-            >
-              <Entrada
-                value={telefonoTienda}
-                onChange={(evento) =>
-                  setTelefonoTienda(limpiarTelefono(evento.target.value))
-                }
-                maxLength={13}
-                inputMode="numeric"
-                placeholder="04121234567"
-              />
-            </Campo>
-            <div className="flex flex-wrap gap-2">
-              <Boton onClick={publicarTienda} cargando={publicandoTienda} disabled={!slugTienda}>
-                <Store className="h-4 w-4" />
-                Publicar cambios
-              </Boton>
-              <Boton
-                variante="secundario"
-                onClick={renovarLinkTienda}
-                cargando={renovandoTienda}
-                disabled={!tokenTienda}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Renovar link
-              </Boton>
-              <Boton variante="secundario" onClick={copiarLinkTienda} disabled={!urlVisible}>
-                <Copy className="h-4 w-4" />
-                Copiar link
-              </Boton>
-              <Boton variante="secundario" onClick={abrirTienda} disabled={!urlVisible}>
-                <ExternalLink className="h-4 w-4" />
-                Abrir tienda
-              </Boton>
-            </div>
-            {slugPendiente ? (
-              <p className="text-[11px] text-[var(--texto-suave)]">
-                Cambio de enlace pendiente: pulsa Publicar cambios o Renovar link para
-                aplicarlo.
-              </p>
-            ) : null}
+            <Boton onClick={publicarTienda} cargando={publicandoTienda} disabled={!slugTienda || !productos.length}>
+              <Store className="h-4 w-4" />
+              Publicar cambios
+            </Boton>
             <p className="text-[11px] text-[var(--texto-suave)]">
-              Configura redes sociales y horario en Configuración, y pulsa Publicar cambios
-              para reflejarlos en el enlace público. Renovar link aplica el slug actual y
-              cambia el token.
+              El enlace, el teléfono, las redes y el horario se configuran en Configuración.
+              Publicar solo actualiza el catálogo visible en la dirección pública.
             </p>
           </div>
 
@@ -686,7 +493,7 @@ export default function TiendaOnline() {
             <Boton
               onClick={publicarTienda}
               cargando={publicandoTienda}
-              disabled={!slugTienda}
+              disabled={!slugTienda || !productos.length}
             >
               <Store className="h-4 w-4" />
               Publicar cambios
@@ -746,9 +553,7 @@ export default function TiendaOnline() {
                 </thead>
                 <tbody className="divide-y divide-[var(--borde)]">
                   {productosFiltrados.map((producto) => {
-                    const imagenUrl = imagenParaVista(
-                      imagenesPorProducto.get(producto.id)
-                    );
+                    const imagenUrl = imagenParaVista(producto);
                     const visible = producto.visibleTienda === true;
                     return (
                       <tr key={producto.id} className="transition hover:bg-[var(--superficie-2)]">
@@ -796,9 +601,7 @@ export default function TiendaOnline() {
 
             <div className="grid gap-3 md:hidden">
               {productosFiltrados.map((producto) => {
-                const imagenUrl = imagenParaVista(
-                  imagenesPorProducto.get(producto.id)
-                );
+                const imagenUrl = imagenParaVista(producto);
                 const visible = producto.visibleTienda === true;
                 return (
                   <Tarjeta key={producto.id} className="p-3">

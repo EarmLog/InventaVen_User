@@ -32,9 +32,18 @@ export function exportarPdfReporte({
     doc.setTextColor(15, 23, 42);
     doc.text(`Negocio: ${negocio.nombre}`, 14, y);
     y += 6;
-    if (negocio.rif) doc.text(`RIF: ${negocio.rif}`, 14, y);
-    if (negocio.direccion) doc.text(`Direccion: ${negocio.direccion}`, 14, y);
-    if (negocio.zonaPostal) doc.text(`Zona Postal: ${negocio.zonaPostal}`, 14, y);
+    if (negocio.rif) {
+      doc.text(`RIF: ${negocio.rif}`, 14, y);
+      y += 5;
+    }
+    if (negocio.direccion) {
+      doc.text(`Direccion: ${negocio.direccion}`, 14, y);
+      y += 5;
+    }
+    if (negocio.zonaPostal) {
+      doc.text(`Zona Postal: ${negocio.zonaPostal}`, 14, y);
+      y += 5;
+    }
     y += 2;
   }
 

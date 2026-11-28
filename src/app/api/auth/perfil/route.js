@@ -43,6 +43,8 @@ function normalizarPerfil(perfil) {
     negocioRegistrado: Boolean(perfil.negocio_registrado),
     sufijoLegal: perfil.sufijo_legal || sufijo || "",
     rif: perfil.rif || "",
+    direccion: perfil.direccion || "",
+    zonaPostal: perfil.zona_postal || "",
     rol: perfil.rol,
     fechaVencimiento: perfil.fecha_vencimiento,
     ultimoAcceso: perfil.ultimo_acceso,
@@ -76,6 +78,8 @@ function perfilDesdeMetadatos(usuario) {
       Boolean(sufijoLegal),
     sufijo_legal: sufijoLegal || null,
     rif: limpiarRif(metadatos.rif) || null,
+    direccion: limpiarTexto(metadatos.direccion, 200) || null,
+    zona_postal: limpiarTexto(metadatos.zona_postal, 20) || null,
     rol: "usuario",
     fecha_vencimiento: sumarDias(new Date(), 30).toISOString(),
     ultimo_acceso: new Date().toISOString(),
@@ -119,7 +123,7 @@ export async function GET(request) {
     return NextResponse.json({ perfil: normalizarPerfil(perfil) });
   } catch (error) {
     return NextResponse.json(
-      { error: "No se pudo cargar el perfil.", detalle: error.message },
+      { error: "No se pudo cargar el perfil." },
       { status: 500 }
     );
   }
@@ -148,6 +152,14 @@ export async function PATCH(request) {
     const tieneNombre = Object.prototype.hasOwnProperty.call(cuerpo, "nombreNegocio");
     const tieneTelefono = Object.prototype.hasOwnProperty.call(cuerpo, "telefono");
     const tieneRif = Object.prototype.hasOwnProperty.call(cuerpo, "rif");
+    const tieneDireccion = Object.prototype.hasOwnProperty.call(
+      cuerpo,
+      "direccion"
+    );
+    const tieneZonaPostal = Object.prototype.hasOwnProperty.call(
+      cuerpo,
+      "zonaPostal"
+    );
     const tieneTipo = Object.prototype.hasOwnProperty.call(cuerpo, "tipoCuenta");
     const tieneRegistrado = Object.prototype.hasOwnProperty.call(
       cuerpo,
@@ -175,6 +187,12 @@ export async function PATCH(request) {
       ? limpiarTelefono(cuerpo.telefono)
       : limpiarTelefono(base.telefono);
     let rif = tieneRif ? limpiarRif(cuerpo.rif) : limpiarRif(base.rif);
+    let direccion = tieneDireccion
+      ? limpiarTexto(cuerpo.direccion, 200)
+      : limpiarTexto(base.direccion, 200);
+    let zonaPostal = tieneZonaPostal
+      ? limpiarTexto(cuerpo.zonaPostal, 20)
+      : limpiarTexto(base.zona_postal, 20);
 
     if (tieneNombre || tieneTipo || tieneRegistrado || tieneSufijo) {
       const errorNombre = validarNombreCuenta(nombreBase);
@@ -190,8 +208,6 @@ export async function PATCH(request) {
       if (tipoCuenta === "empresa") negocioRegistrado = true;
       if (tipoCuenta === "personal") {
         negocioRegistrado = false;
-        sufijoLegal = "";
-        rif = "";
       }
       if (negocioRegistrado && tipoCuenta !== "personal") {
         if (!sufijoLegal || !esSufijoLegalValido(sufijoLegal)) {
@@ -201,7 +217,7 @@ export async function PATCH(request) {
           );
         }
       } else {
-        sufijoLegal = "";
+        sufijoLegal = base.sufijo_legal || sufijoActual || "";
       }
       nombreBase = limpiarTexto(nombreBase, 160);
     }
@@ -234,12 +250,8 @@ export async function PATCH(request) {
     }
     if (tieneTelefono) actualizaciones.telefono = telefono || null;
     if (tieneRif) actualizaciones.rif = rif || null;
-    if (
-      tipoCuenta === "personal" &&
-      (tieneNombre || tieneTipo || tieneRegistrado || tieneSufijo)
-    ) {
-      actualizaciones.rif = null;
-    }
+    if (tieneDireccion) actualizaciones.direccion = direccion || null;
+    if (tieneZonaPostal) actualizaciones.zona_postal = zonaPostal || null;
 
     let perfilActualizado = base;
     if (perfilActual) {
@@ -279,6 +291,8 @@ export async function PATCH(request) {
       negocio_registrado: negocioRegistrado,
       sufijo_legal: sufijoLegal || "",
       rif: rif || "",
+      direccion: direccion || "",
+      zona_postal: zonaPostal || "",
     };
     if (tieneOnboarding) {
       metadatosActualizados.onboardingVisto = Boolean(cuerpo.onboardingVisto);
@@ -305,7 +319,7 @@ export async function PATCH(request) {
     return NextResponse.json({ perfil: normalizarPerfil(perfilActualizado) });
   } catch (error) {
     return NextResponse.json(
-      { error: "No se pudo actualizar el perfil.", detalle: error.message },
+      { error: "No se pudo actualizar el perfil." },
       { status: 500 }
     );
   }

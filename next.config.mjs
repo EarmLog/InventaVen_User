@@ -9,10 +9,22 @@ const withSerwist = withSerwistInit({
 });
 
 /** @type {import("next").NextConfig} */
+const cabecerasPrivacidad = [
+  { key: "Referrer-Policy", value: "no-referrer" },
+  { key: "X-Robots-Tag", value: "noindex, nofollow" },
+];
+
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   eslint: { ignoreDuringBuilds: true },
+  async headers() {
+    return [
+      { source: "/tienda/:path*", headers: cabecerasPrivacidad },
+      { source: "/api/tienda/:path*", headers: cabecerasPrivacidad },
+      { source: "/api/imagenes/:path*", headers: cabecerasPrivacidad },
+    ];
+  },
 };
 
 export default withSerwist(nextConfig);

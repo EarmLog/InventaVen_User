@@ -1,3 +1,5 @@
+import { obtenerClienteSupabase } from "@/lib/supabase/cliente";
+
 export function traducirErrorAuth(error) {
   const mensaje = String(error?.message || "").toLowerCase();
   if (!mensaje) return "Ocurrió un error inesperado. Intenta de nuevo.";
@@ -56,4 +58,35 @@ export async function solicitarPerfil(token, metodo = "GET", cuerpo = null) {
     throw new Error(datos.error || datos.detalle || "No se pudo cargar el perfil.");
   }
   return datos.perfil;
+}
+
+export async function obtenerEncabezadosAutenticados() {
+  const supabase = obtenerClienteSupabase();
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data?.session?.access_token) {
+    throw new Error("Inicia sesión nuevamente para continuar.");
+  }
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${data.session.access_token}`,
+  };
+}
+
+export async function leerRespuestaAutenticada(respuesta) {
+  const datos = await respuesta.json().catch(() => ({}));
+  if (!respuesta.ok) {
+    throw new Error(datos.error || "No se pudo completar la solicitud.");
+  }
+  return datos;
+}
+
+export async function solicitarConfiguracion(metodo = "GET", cuerpo = null) {
+  const encabezados = await obtenerEncabezadosAutenticados();
+  const respuesta = await fetch("/api/configuracion", {
+    method: metodo,
+    headers: encabezados,
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+    cache: "no-store",
+  });
+  return leerRespuestaAutenticada(respuesta);
 }

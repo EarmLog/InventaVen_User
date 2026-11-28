@@ -8,25 +8,13 @@ function respuestaError(error, mensaje) {
   const estado = error?.code === "23505" ? 409 : 500;
   return NextResponse.json(
     {
-      error: estado === 409 ? "El enlace de la tienda ya está en uso." : mensaje,
-      detalle: error?.message || String(error),
+      error:
+        estado === 409
+          ? "El enlace de la tienda ya está en uso."
+          : mensaje,
     },
     { status: estado }
   );
-}
-
-function imagenABytes(valor) {
-  let base64 = valor.replace(/=+$/, "");
-  while (base64.length % 4 !== 0) base64 += "=";
-  if (typeof atob === "function") {
-    const binario = atob(base64);
-    const bytes = new Uint8Array(binario.length);
-    for (let indice = 0; indice < binario.length; indice += 1) {
-      bytes[indice] = binario.charCodeAt(indice);
-    }
-    return bytes;
-  }
-  return new Uint8Array(globalThis.Buffer.from(base64, "base64"));
 }
 
 export async function POST(request) {
@@ -57,12 +45,12 @@ export async function POST(request) {
 
     const { data: imagenesExistentes, error: errorImagenesExistentes } = await cliente
       .from("catalogo_productos")
-      .select("producto_id, imagen_url")
+      .select("producto_id, imagen_token")
       .eq("tienda_id", usuario.id);
     if (errorImagenesExistentes) throw errorImagenesExistentes;
 
     const imagenesActuales = new Map(
-      (imagenesExistentes || []).map((item) => [item.producto_id, item.imagen_url])
+      (imagenesExistentes || []).map((item) => [item.producto_id, item.imagen_token])
     );
 
     const { data: tiendaActual, error: errorTiendaActual } = await cliente
@@ -95,19 +83,6 @@ export async function POST(request) {
     );
     if (errorUpsertTienda) throw errorUpsertTienda;
 
-    const bucket = cliente.storage.from("catalogo-productos");
-    for (const producto of datos.productos) {
-      if (!producto.imagenBase64) continue;
-      const ruta = `${usuario.id}/${producto.id}.jpg`;
-      const { error: errorImagen } = await bucket.upload(ruta, imagenABytes(producto.imagenBase64), {
-        upsert: true,
-        contentType: "image/jpeg",
-      });
-      if (errorImagen) {
-        throw new Error(`No se pudo subir la imagen de ${producto.nombre}.`);
-      }
-    }
-
     const ids = datos.productos.map((producto) => producto.id);
     const { data: anteriores, error: errorAnteriores } = await cliente
       .from("catalogo_productos")
@@ -136,9 +111,7 @@ export async function POST(request) {
         categoria: producto.categoria,
         precio_usd: producto.precioUsd,
         precio_ves: producto.precioVes,
-        imagen_url: producto.imagenBase64
-          ? bucket.getPublicUrl(`${usuario.id}/${producto.id}.jpg`).data.publicUrl
-          : imagenesActuales.get(producto.id) || null,
+        imagen_token: producto.imagenToken || imagenesActuales.get(producto.id) || null,
         sku: producto.sku,
         stock: producto.stock,
         variantes: producto.variantes,

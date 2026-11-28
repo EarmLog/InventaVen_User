@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boxes, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProveedorTasa, useTasa } from "@/context/TasaContext";
+import { useConfiguracion } from "@/context/ConfiguracionContext";
 import { useSesion } from "@/context/SesionContext";
+import { solicitarConfiguracion } from "@/lib/api/auth";
 import BarraLateral from "@/components/layout/BarraLateral";
 import BarraSuperior from "@/components/layout/BarraSuperior";
 import ModalBienvenida from "@/components/modules/onboarding/ModalBienvenida";
@@ -13,14 +15,20 @@ import IndicadorConexion from "@/components/ui/IndicadorConexion";
 import { asegurarDatosIniciales, configurarBaseDatosUsuario } from "@/lib/db/baseDatos";
 import { ejecutarCopiaAutomatica } from "@/lib/db/copiaAutomatica";
 import {
+  descargarRespaldoNube,
+  listarRespaldosNube,
+} from "@/lib/db/respaldoNube";
+import { restaurarRespaldo } from "@/lib/db/respaldo";
+import {
   actualizarPreciosPorTasa,
   actualizarSaldosDeudoresPorTasa,
   guardarAjuste,
+  guardarAjustes,
   obtenerAjustes,
 } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 import { formatearVes } from "@/lib/utilidades/formato";
-import { tasaBajoSospechosa, tasaEsValida } from "@/lib/utilidades/tasa";
+import { tasaEsValida } from "@/lib/utilidades/tasa";
 
 function PantallaCargando({ texto = "Preparando tu panel..." }) {
   return (
@@ -40,33 +48,78 @@ function ContenidoPanel({ children }) {
   const router = useRouter();
   const { sesion, perfil, cargandoPerfil, refrescarPerfil, onboardingAbierto, setOnboardingAbierto, abrirOnboarding, cerrarOnboarding, marcarOnboardingCompletado } = useSesion();
   const { tasa } = useTasa();
+  const { configuracion, listo, recargar } = useConfiguracion();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [autoPrecios, setAutoPrecios] = useState(false);
   const [ultimaTasaAplicada, setUltimaTasaAplicada] = useState(null);
+  const copiasHabilitadasRef = useRef(false);
+  const autoRestaurado = useRef(false);
 
   useEffect(() => {
     if (sesion === null) router.replace("/login");
   }, [sesion, router]);
 
   useEffect(() => {
-    if (!sesion) return undefined;
+    if (!sesion || !listo) return undefined;
     let activo = true;
     let intervalo = null;
+    let restauradoAhora = false;
     let manejarOnline = null;
     let manejarVisibilidad = null;
     const userId = sesion.user?.id || "public";
 
-    configurarBaseDatosUsuario(userId).then(() => {
+    (async () => {
+      await configurarBaseDatosUsuario(userId);
       if (!activo) return;
-      asegurarDatosIniciales().catch(() => null);
+      await asegurarDatosIniciales().catch(() => null);
+
+      if (!autoRestaurado.current) {
+        autoRestaurado.current = true;
+        try {
+          const ajustes = await obtenerAjustes();
+          if (!ajustes[CLAVES_AJUSTES.ONBOARDING_VISTO]) {
+            const copias = await listarRespaldosNube().catch(() => []);
+            const ultima = copias[0];
+            if (ultima) {
+              const blob = await descargarRespaldoNube(ultima.nombre);
+              await restaurarRespaldo(blob, { reemplazar: true });
+              const datosRestaurados = {
+                [CLAVES_AJUSTES.ONBOARDING_VISTO]: true,
+                [CLAVES_AJUSTES.COPIA_NUBE_ACTIVA]: true,
+                [CLAVES_AJUSTES.COPIA_NUBE_ULTIMA]: ultima.nombre,
+                [CLAVES_AJUSTES.COPIA_NUBE_ULTIMA_FECHA]: new Date().toISOString(),
+                [CLAVES_AJUSTES.COPIA_NUBE_ULTIMO_ERROR]: "",
+              };
+              restauradoAhora = true;
+              await guardarAjustes(datosRestaurados);
+              await solicitarConfiguracion("PATCH", datosRestaurados).catch(() => null);
+              await recargar();
+              window.dispatchEvent(new Event("inventaven-ajustes"));
+              toast.success("Restauramos tus datos desde la última copia en la nube.");
+            }
+          }
+        } catch {
+          await guardarAjustes({
+            [CLAVES_AJUSTES.COPIA_NUBE_ULTIMO_ERROR]:
+              "No se pudo restaurar la copia en la nube.",
+          }).catch(() => null);
+        }
+      }
+
+      if (!activo) return;
+      copiasHabilitadasRef.current = true;
       refrescarPerfil();
-      if (sesion.user?.email === "demo.inventaven2026@gmail.com") {
-        import("@/lib/db/demoSemilla").then(({ sembrarDatosDemo }) => {
-          sembrarDatosDemo().catch(() => null);
-        });
+      if (sesion.user?.email === "demo.inventaven2026@gmail.com" && !restauradoAhora) {
+        const ajustesDemo = await obtenerAjustes();
+        if (!ajustesDemo[CLAVES_AJUSTES.ONBOARDING_VISTO]) {
+          import("@/lib/db/demoSemilla").then(({ sembrarDatosDemo }) => {
+            sembrarDatosDemo().catch(() => null);
+          });
+        }
       }
 
       const ejecutarCopia = () => {
+        if (!copiasHabilitadasRef.current) return;
         ejecutarCopiaAutomatica().catch(() => null);
       };
       manejarOnline = ejecutarCopia;
@@ -77,7 +130,7 @@ function ContenidoPanel({ children }) {
       document.addEventListener("visibilitychange", manejarVisibilidad);
       intervalo = window.setInterval(ejecutarCopia, 60 * 60 * 1000);
       ejecutarCopia();
-    });
+    })();
 
     return () => {
       activo = false;
@@ -87,7 +140,7 @@ function ContenidoPanel({ children }) {
       }
       if (intervalo) window.clearInterval(intervalo);
     };
-  }, [sesion, refrescarPerfil]);
+  }, [sesion, listo, refrescarPerfil, recargar]);
 
   useEffect(() => {
     let activo = true;
@@ -112,32 +165,19 @@ function ContenidoPanel({ children }) {
   }, []);
 
   useEffect(() => {
-    let activo = true;
-    async function revisarOnboarding() {
-      try {
-        const ajustes = await obtenerAjustes();
-        if (!activo) return;
-        setOnboardingAbierto(!ajustes[CLAVES_AJUSTES.ONBOARDING_VISTO]);
-      } catch {
-        if (activo) setOnboardingAbierto(false);
-      }
-    }
-    if (sesion) revisarOnboarding();
-    return () => {
-      activo = false;
-    };
-  }, [sesion]);
+    if (!sesion || !listo) return;
+    setOnboardingAbierto(
+      !configuracion[CLAVES_AJUSTES.ONBOARDING_VISTO] && !perfil?.onboardingVisto
+    );
+  }, [sesion, listo, configuracion, perfil?.onboardingVisto, setOnboardingAbierto]);
 
   useEffect(() => {
     if (!autoPrecios || !tasa || !sesion) return;
     if (!tasaEsValida(tasa)) return;
     if (ultimaTasaAplicada !== null && Math.abs(ultimaTasaAplicada - tasa) < 0.0001) return;
-    if (
-      ultimaTasaAplicada !== null &&
-      tasaBajoSospechosa(tasa, ultimaTasaAplicada)
-    ) {
-      toast.warning(
-        "La tasa bajó 10% o más. No se actualizaron los precios automáticamente para protegerlos."
+    if (ultimaTasaAplicada !== null && tasa < ultimaTasaAplicada - 0.0001) {
+      toast.info(
+        "La tasa bajó. Los precios y saldos no se reducen automáticamente; puedes aplicar la bajada desde Configuración."
       );
       return;
     }

@@ -46,15 +46,24 @@ export async function obtenerAjustes() {
   }, {});
 }
 
+function notificarAjustesLocales(cambios) {
+  if (typeof window === "undefined" || !Object.keys(cambios).length) return;
+  window.dispatchEvent(
+    new CustomEvent("inventaven-configuracion-local", { detail: { cambios } })
+  );
+}
+
 export async function guardarAjuste(clave, valor) {
   if (!db) return;
   await db.ajustes.put({ clave, valor });
+  notificarAjustesLocales({ [clave]: valor });
 }
 
 export async function guardarAjustes(objeto) {
   if (!db) return;
   const filas = Object.entries(objeto).map(([clave, valor]) => ({ clave, valor }));
   await db.ajustes.bulkPut(filas);
+  notificarAjustesLocales(objeto);
 }
 
 async function siguienteSecuenciaEnTransaccion(nombre, longitud) {
@@ -184,6 +193,8 @@ export async function guardarProducto(datos) {
       stockMinimo: Math.max(0, limpiarNumero(datos.stockMinimo, 0)),
       activo: datos.activo !== false,
       visibleTienda: Boolean(datos.visibleTienda),
+      imagenRuta: datos.imagenRuta ?? existente?.imagenRuta ?? null,
+      imagenToken: datos.imagenToken ?? existente?.imagenToken ?? null,
       ofertaActiva: Boolean(datos.ofertaActiva),
       ofertaCantidad: Math.max(1, Math.round(limpiarNumero(datos.ofertaCantidad, 1))),
       ofertaDescuento: Math.min(
@@ -828,14 +839,20 @@ export async function actualizarPreciosPorTasa(nuevaTasa) {
         if (ventaUsd <= 0) return variante;
         return {
           ...variante,
-          precioVentaVes: redondear(ventaUsd * tasa),
+          precioVentaVes: redondear(
+            Math.max(Number(variante.precioVentaVes) || 0, ventaUsd * tasa)
+          ),
           actualizadoEn: ahora,
         };
       });
       await db.productos.put({
         ...producto,
-        precioCompraVes: redondear(precioCompraUsd * tasa),
-        precioVentaVes: redondear(precioVentaUsd * tasa),
+        precioCompraVes: redondear(
+          Math.max(Number(producto.precioCompraVes) || 0, precioCompraUsd * tasa)
+        ),
+        precioVentaVes: redondear(
+          Math.max(Number(producto.precioVentaVes) || 0, precioVentaUsd * tasa)
+        ),
         variantes,
         tasaUsd: tasa,
         actualizadoEn: ahora,
@@ -1144,7 +1161,9 @@ export async function actualizarSaldosDeudoresPorTasa(nuevaTasa) {
       if (deuda.estado === "pagada") continue;
       await db.deudas.put({
         ...deuda,
-        saldoVes: redondear(Number(deuda.saldoUsd) * tasa),
+        saldoVes: redondear(
+          Math.max(Number(deuda.saldoVes) || 0, Number(deuda.saldoUsd) * tasa)
+        ),
         tasaUsd: tasa,
         actualizadoEn: ahora,
       });
@@ -1152,6 +1171,66 @@ export async function actualizarSaldosDeudoresPorTasa(nuevaTasa) {
     }
     return { actualizados };
   });
+}
+
+export async function recalcularPreciosYSaldosForzados(nuevaTasa) {
+  validarBaseDatos();
+  const tasa = Number(nuevaTasa);
+  if (!Number.isFinite(tasa) || tasa <= 0) {
+    throw new Error("La tasa del dólar no es válida.");
+  }
+  const ahora = new Date().toISOString();
+  let productos = 0;
+  let deudas = 0;
+
+  await db.transaction("rw", db.productos, db.deudas, db.ajustes, async () => {
+    const listaProductos = await db.productos.toArray();
+    for (const producto of listaProductos) {
+      const precioCompraUsd = Number(producto.precioCompraUsd) || 0;
+      const precioVentaUsd = Number(producto.precioVentaUsd) || 0;
+      if (precioCompraUsd <= 0 && precioVentaUsd <= 0) continue;
+      const variantes = (producto.variantes || []).map((variante) => {
+        const ventaUsd = Number(variante.precioVentaUsd) || 0;
+        if (ventaUsd <= 0) return variante;
+        return {
+          ...variante,
+          precioVentaVes: redondear(ventaUsd * tasa),
+          actualizadoEn: ahora,
+        };
+      });
+      await db.productos.put({
+        ...producto,
+        precioCompraVes: redondear(precioCompraUsd * tasa),
+        precioVentaVes: redondear(precioVentaUsd * tasa),
+        variantes,
+        tasaUsd: tasa,
+        actualizadoEn: ahora,
+      });
+      productos += 1;
+    }
+
+    const listaDeudas = await db.deudas.toArray();
+    for (const deuda of listaDeudas) {
+      if (deuda.estado === "pagada") continue;
+      await db.deudas.put({
+        ...deuda,
+        saldoVes: redondear(Number(deuda.saldoUsd) * tasa),
+        tasaUsd: tasa,
+        actualizadoEn: ahora,
+      });
+      deudas += 1;
+    }
+
+    await db.ajustes.bulkPut([
+      {
+        clave: CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS,
+        valor: ahora,
+      },
+      { clave: CLAVES_AJUSTES.TASA_ULTIMA_APLICADA, valor: tasa },
+    ]);
+  });
+
+  return { productos, deudas };
 }
 
 export async function obtenerResumenDeudores() {

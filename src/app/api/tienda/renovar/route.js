@@ -9,7 +9,6 @@ function respuestaError(error, mensaje) {
   return NextResponse.json(
     {
       error: estado === 409 ? "El enlace de la tienda ya está en uso." : mensaje,
-      detalle: error?.message || String(error),
     },
     { status: estado }
   );

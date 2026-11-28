@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useConfiguracion } from "@/context/ConfiguracionContext";
 import { guardarAjuste } from "@/lib/db/repositorios";
 import { CLAVES_AJUSTES } from "@/lib/utilidades/constantes";
 
@@ -14,10 +15,14 @@ function aplicarTema(tema) {
 }
 
 export function ProveedorTema({ children }) {
+  const { configuracion, listo } = useConfiguracion();
   const [tema, setTema] = useState("claro");
+  const temaRemoto = configuracion[CLAVES_AJUSTES.TEMA];
 
   useEffect(() => {
+    if (!listo) return;
     const guardado =
+      temaRemoto ||
       window.localStorage.getItem(CLAVE_LOCAL) ||
       document.documentElement.getAttribute("data-tema") ||
       "claro";
@@ -25,7 +30,7 @@ export function ProveedorTema({ children }) {
     setTema(normalizado);
     aplicarTema(normalizado);
     window.localStorage.setItem(CLAVE_LOCAL, normalizado);
-  }, []);
+  }, [listo, temaRemoto]);
 
   const cambiarTema = useCallback(async (nuevoTema) => {
     const normalizado = nuevoTema === "oscuro" ? "oscuro" : "claro";
@@ -35,7 +40,6 @@ export function ProveedorTema({ children }) {
     try {
       await guardarAjuste(CLAVES_AJUSTES.TEMA, normalizado);
     } catch {
-      // El tema sigue funcionando aunque la base local no esté lista.
     }
   }, []);
 

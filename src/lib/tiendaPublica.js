@@ -1,5 +1,4 @@
 const URL_DEFECTO = "https://inventa-ven-user.vercel.app";
-const MAX_IMAGEN_BYTES = 5 * 1024 * 1024;
 const MAX_VARIANTES = 50;
 
 function limpiarTexto(valor, maximo) {
@@ -7,14 +6,6 @@ function limpiarTexto(valor, maximo) {
     .trim()
     .replace(/\s+/g, " ")
     .slice(0, maximo);
-}
-
-function limpiarBase64(valor) {
-  const texto = String(valor ?? "")
-    .trim()
-    .replace(/\s/g, "");
-  if (!texto) return "";
-  return texto.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
 }
 
 function limpiarTelegram(valor) {
@@ -63,13 +54,7 @@ export function normalizarSlug(valor) {
 
 export function generarToken() {
   const bytes = new Uint8Array(24);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let indice = 0; indice < bytes.length; indice += 1) {
-      bytes[indice] = Math.floor(Math.random() * 256);
-    }
-  }
+  globalThis.crypto.getRandomValues(bytes);
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -161,14 +146,9 @@ export function validarPayloadCatalogo(cuerpo) {
       return { datos: null, error: `Los precios del producto ${indice + 1} no son válidos.` };
     }
 
-    const imagenBase64 = limpiarBase64(producto.imagenBase64);
-    if (imagenBase64) {
-      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(imagenBase64)) {
-        return { datos: null, error: `La imagen del producto ${indice + 1} no es válida.` };
-      }
-      if (Math.floor((imagenBase64.length * 3) / 4) > MAX_IMAGEN_BYTES) {
-        return { datos: null, error: `La imagen del producto ${indice + 1} supera los 5 MB.` };
-      }
+    const imagenToken = String(producto.imagenToken || "").trim().toLowerCase();
+    if (imagenToken && !/^[0-9a-f]{48}$/.test(imagenToken)) {
+      return { datos: null, error: `La imagen del producto ${indice + 1} no es válida.` };
     }
 
     const sku = limpiarTexto(producto.sku, 80) || null;
@@ -239,7 +219,7 @@ export function validarPayloadCatalogo(cuerpo) {
       categoria,
       precioUsd,
       precioVes,
-      imagenBase64: imagenBase64 || null,
+      imagenToken: imagenToken || null,
       sku,
       stock,
       variantes,

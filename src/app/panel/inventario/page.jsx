@@ -76,15 +76,6 @@ export default function PaginaInventario() {
   const productos =
     useLiveQuery(() => (db ? db.productos.orderBy("creadoEn").reverse().toArray() : []), [], []) ||
     [];
-  const imagenes =
-    useLiveQuery(() => (db ? db.imagenesProducto.toArray() : []), [], []) || [];
-  const imagenesPorProducto = useMemo(
-    () =>
-      Object.fromEntries(
-        imagenes.map((imagen) => [imagen.productoId, imagen.datos])
-      ),
-    [imagenes]
-  );
   const [busqueda, setBusqueda] = useState("");
   const [categoria, setCategoria] = useState("todas");
   const [filtro, setFiltro] = useState("todos");
@@ -334,9 +325,9 @@ export default function PaginaInventario() {
                       <tr key={producto.id}>
                         <td>
                           <div className="flex items-start gap-2.5">
-                            {imagenesPorProducto[producto.id] ? (
+                            {producto.imagenToken && `/api/imagenes/ver/${producto.imagenToken}` ? (
                               <img
-                                src={imagenesPorProducto[producto.id]}
+                                src={producto.imagenToken && `/api/imagenes/ver/${producto.imagenToken}`}
                                 alt={`Foto de ${producto.nombre}`}
                                 className="mt-0.5 h-9 w-9 shrink-0 rounded-xl border border-[var(--borde)] object-cover"
                               />
@@ -489,9 +480,9 @@ export default function PaginaInventario() {
                 <Tarjeta key={producto.id} className="p-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-start gap-2.5">
-                      {imagenesPorProducto[producto.id] ? (
+                      {producto.imagenToken && `/api/imagenes/ver/${producto.imagenToken}` ? (
                         <img
-                          src={imagenesPorProducto[producto.id]}
+                          src={producto.imagenToken && `/api/imagenes/ver/${producto.imagenToken}`}
                           alt={`Foto de ${producto.nombre}`}
                           className="h-11 w-11 shrink-0 rounded-xl border border-[var(--borde)] object-cover"
                         />

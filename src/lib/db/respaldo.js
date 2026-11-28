@@ -620,36 +620,6 @@ function maximaSecuenciaDesdeDatos(productos, ventas, nombre, deudas = []) {
   }, 0);
 }
 
-const AJUSTES_OPERATIVOS_PRESERVADOS = [
-  CLAVES_AJUSTES.COPIA_NUBE_ACTIVA,
-  CLAVES_AJUSTES.COPIA_NUBE_ULTIMA,
-  CLAVES_AJUSTES.COPIA_NUBE_ULTIMA_FECHA,
-  CLAVES_AJUSTES.COPIA_NUBE_ULTIMO_ERROR,
-  CLAVES_AJUSTES.COPIA_NUBE_EN_CURSO,
-  CLAVES_AJUSTES.GOOGLE_DRIVE_ACTIVO,
-  CLAVES_AJUSTES.GOOGLE_DRIVE_CUENTA,
-  CLAVES_AJUSTES.GOOGLE_DRIVE_ULTIMA,
-  CLAVES_AJUSTES.TASA_USD,
-  CLAVES_AJUSTES.TASA_ACTUALIZADA_EN,
-  CLAVES_AJUSTES.TASA_ULTIMA_APLICADA,
-  CLAVES_AJUSTES.TASA_MANUAL,
-  CLAVES_AJUSTES.NOMBRE_NEGOCIO,
-  CLAVES_AJUSTES.RIF_NEGOCIO,
-  CLAVES_AJUSTES.ONBOARDING_VISTO,
-  CLAVES_AJUSTES.METODO_DEUDA_ACTIVO,
-  CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR,
-  CLAVES_AJUSTES.COMISION_CASHEA,
-  CLAVES_AJUSTES.TIENDA_SLUG,
-  CLAVES_AJUSTES.TIENDA_TOKEN,
-  CLAVES_AJUSTES.TIENDA_ACTIVA,
-  CLAVES_AJUSTES.TIENDA_TELEFONO,
-  CLAVES_AJUSTES.TIENDA_PUBLICADA_EN,
-  CLAVES_AJUSTES.TIENDA_HORARIO,
-  CLAVES_AJUSTES.TIENDA_TELEGRAM,
-  CLAVES_AJUSTES.TIENDA_INSTAGRAM,
-  CLAVES_AJUSTES.TIENDA_CORREO_CONTACTO,
-];
-
 export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
   if (!db) throw new Error("La base de datos no está disponible.");
   if (!archivo) throw new Error("Selecciona un archivo ZIP de respaldo.");
@@ -677,9 +647,6 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
   }
 
   const ahora = new Date().toISOString();
-  const ajustesPreservados = reemplazar
-    ? (await db.ajustes.bulkGet(AJUSTES_OPERATIVOS_PRESERVADOS)).filter(Boolean)
-    : [];
 
   await db.transaction(
     "rw",
@@ -735,19 +702,11 @@ export async function restaurarRespaldo(archivo, { reemplazar = true } = {}) {
       if (datos.clientes.length) await db.clientes.bulkPut(datos.clientes);
       if (datos.deudas.length) await db.deudas.bulkPut(datos.deudas);
       if (datos.abonos.length) await db.abonos.bulkPut(datos.abonos);
-      if (datos.imagenesProducto.length) {
-        await db.imagenesProducto.bulkPut(datos.imagenesProducto);
-      }
-
       const ajustes = Object.entries(datos.ajustes || {}).map(([clave, valor]) => ({
         clave,
         valor,
       }));
       if (ajustes.length) await db.ajustes.bulkPut(ajustes);
-
-      if (ajustesPreservados.length) {
-        await db.ajustes.bulkPut(ajustesPreservados);
-      }
 
       const secuenciasGuardadas = new Map(
         (datos.secuencias || []).map((secuencia) => [secuencia.nombre, secuencia.valor])

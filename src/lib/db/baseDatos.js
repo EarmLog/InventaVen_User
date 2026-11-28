@@ -90,6 +90,34 @@ class BaseDatosInventaVen extends Dexie {
         "id, deudaId, clienteId, ventaId, fecha, montoUsd, montoVes, metodoPago",
       imagenesProducto: "id, productoId, creadoEn, actualizadoEn",
     });
+    this.version(7)
+      .stores({
+        productos:
+          "id, sku, nombre, categoria, activo, creadoEn, actualizadoEn, fechaRenovacion, visibleTienda",
+        ventas:
+          "id, codigo, numeroFactura, fecha, estado, tipoPago, creadoEn, esCredito, deudaId",
+        ajustes: "clave",
+        secuencias: "nombre",
+        movimientos: "id, productoId, varianteId, tipo, fecha",
+        facturasFiscales:
+          "id, ventaId, tipo, estado, fecha, totalUsd, createdAt, updatedAt",
+        auditorias:
+          "id, usuarioId, accion, entidad, entidadId, fecha, detalle",
+        operacionesEspeciales:
+          "id, tipo, entidadId, entidadTipo, fecha, detalle, estado",
+        proveedores: "id, nombre, rif, telefono, email, creadoEn",
+        compras: "id, fecha, tipo, estado, totalUsd, createdAt, updatedAt",
+        cajas: "id, nombre, codigo, estado, creador, fechaCreacion, fechaCierre",
+        clientes: "id, nombre, telefono, documento, creadoEn, actualizadoEn",
+        deudas:
+          "id, ventaId, clienteId, origen, estado, fecha, saldoUsd, saldoVes, creadoEn, actualizadoEn",
+        abonos:
+          "id, deudaId, clienteId, ventaId, fecha, montoUsd, montoVes, metodoPago",
+        imagenesProducto: "id, productoId, creadoEn, actualizadoEn",
+      })
+      .upgrade(async (transaccion) => {
+        await transaccion.table("imagenesProducto").clear();
+      });
   }
 }
 
@@ -123,11 +151,20 @@ export async function asegurarDatosIniciales() {
     { clave: CLAVES_AJUSTES.TASA_USD, valor: 0 },
     { clave: CLAVES_AJUSTES.TASA_ACTUALIZADA_EN, valor: null },
     { clave: CLAVES_AJUSTES.ULTIMA_ACTUALIZACION_PRECIOS, valor: null },
+    { clave: CLAVES_AJUSTES.TASA_MANUAL, valor: false },
+    { clave: CLAVES_AJUSTES.TASA_MANUAL_VALOR, valor: 0 },
+    { clave: CLAVES_AJUSTES.ONBOARDING_VISTO, valor: false },
+    { clave: CLAVES_AJUSTES.NOMBRE_NEGOCIO, valor: "" },
+    { clave: CLAVES_AJUSTES.RIF_NEGOCIO, valor: "" },
+    { clave: CLAVES_AJUSTES.COPIA_NUBE_ACTIVA, valor: false },
+    { clave: CLAVES_AJUSTES.TIENDA_SLUG, valor: "" },
+    { clave: CLAVES_AJUSTES.TIENDA_TOKEN, valor: "" },
     { clave: CLAVES_AJUSTES.METODO_DEUDA_ACTIVO, valor: false },
     { clave: CLAVES_AJUSTES.ACTUALIZAR_SALDOS_DEUDOR_DOLAR, valor: false },
     { clave: CLAVES_AJUSTES.COMISION_CASHEA, valor: 0 },
     { clave: CLAVES_AJUSTES.TIENDA_ACTIVA, valor: false },
     { clave: CLAVES_AJUSTES.TIENDA_PUBLICADA_EN, valor: null },
+    { clave: CLAVES_AJUSTES.TIENDA_TELEFONO, valor: "" },
     { clave: CLAVES_AJUSTES.TIENDA_HORARIO, valor: "" },
     { clave: CLAVES_AJUSTES.TIENDA_TELEGRAM, valor: "" },
     { clave: CLAVES_AJUSTES.TIENDA_INSTAGRAM, valor: "" },
